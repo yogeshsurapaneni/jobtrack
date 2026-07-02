@@ -1,0 +1,406 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ job.position }} at {{ job.company }} - Details{% endblock %}
+
+{% block content %}
+<!-- Back button and title -->
+<div class="mb-4">
+    <a href="{{ url_for('main.jobs_list') }}" class="text-decoration-none text-muted small"><i class="fa-solid fa-arrow-left me-1"></i>Back to Applications</a>
+    <div class="d-flex flex-wrap justify-content-between align-items-center mt-2 g-3">
+        <div>
+            <h2 class="fw-bold text-dark mb-1">{{ job.position }}</h2>
+            <h5 class="text-muted"><i class="fa-solid fa-building me-2"></i>{{ job.company }}</h5>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#editJobModal">
+                <i class="fa-solid fa-pen-to-square me-1"></i>Edit
+            </button>
+            <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteJobModal">
+                <i class="fa-solid fa-trash me-1"></i>Delete
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Left Column: Job Details & Description -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm p-4 mb-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-circle-info text-primary me-2"></i>Job Information</h5>
+            
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6">
+                    <div class="text-muted small">Location</div>
+                    <div class="fw-semibold text-dark">{{ job.location or 'Not Specified' }}</div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="text-muted small">Salary Range</div>
+                    <div class="fw-semibold text-dark">{{ job.salary or 'Not Specified' }}</div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="text-muted small">Job Posting URL</div>
+                    <div class="fw-semibold">
+                        {% if job.job_url %}
+                        <a href="{{ job.job_url }}" target="_blank" class="text-decoration-none text-primary"><i class="fa-solid fa-arrow-up-right-from-square me-1"></i>Visit Page</a>
+                        {% else %}
+                        <span class="text-muted">No URL provided</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="text-muted small">Date Applied</div>
+                    <div class="fw-semibold text-dark">
+                        {{ job.applied_date.strftime('%B %d, %Y') if job.applied_date else 'Not Applied Yet' }}
+                    </div>
+                </div>
+            </div>
+
+            <h5 class="fw-bold mb-2">Job Description</h5>
+            <div class="bg-light p-3 rounded-3 font-monospace text-dark mb-4" style="max-height: 350px; overflow-y: auto; font-size: 0.9em; white-space: pre-wrap;">
+                {{ job.job_description or 'No job description provided.' }}
+            </div>
+
+            <h5 class="fw-bold mb-2">Notes</h5>
+            <p class="text-dark bg-light-subtle border-start border-primary border-3 ps-3 py-1 mb-0" style="white-space: pre-wrap;">
+                {{ job.notes or 'No personal notes.' }}
+            </p>
+        </div>
+        
+        <!-- Documents Section -->
+        <div class="card border-0 shadow-sm p-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-folder-open text-primary me-2"></i>Tailored Application Documents</h5>
+            
+            <div class="row">
+                <!-- Resumes Column -->
+                <div class="col-md-6 border-end-md mb-4 mb-md-0">
+                    <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-file-pdf me-2"></i>Tailored Resumes</h6>
+                    {% if resumes %}
+                        <div class="list-group list-group-flush">
+                            {% for doc in resumes %}
+                            <div class="list-group-item px-0 py-2 border-0">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="fw-semibold text-dark">Version {{ doc.version }}</div>
+                                        <div class="text-muted small" style="font-size: 0.75em;">Model: {{ doc.model_used.split('/')[-1] }}</div>
+                                        <div class="text-muted small" style="font-size: 0.75em;">{{ doc.created_at.strftime('%b %d, %Y') }}</div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <a href="{{ url_for('main.download_document', doc_id=doc.id) }}" class="btn btn-sm btn-light text-primary" title="Download">
+                                            <i class="fa-solid fa-download"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-light" data-bs-toggle="collapse" data-bs-target="#prompt-res-{{ doc.id }}" title="Show Prompt Details">
+                                            <i class="fa-solid fa-code"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="collapse mt-2" id="prompt-res-{{ doc.id }}">
+                                    <div class="bg-dark text-light p-2 rounded small font-monospace" style="max-height: 150px; overflow-y: auto; font-size: 0.75em; white-space: pre-wrap;">
+                                        {{ doc.prompt_used }}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <span class="text-muted small">No tailored resumes generated yet.</span>
+                    {% endif %}
+                </div>
+
+                <!-- Cover Letters Column -->
+                <div class="col-md-6">
+                    <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-envelope-open-text me-2"></i>Cover Letters</h6>
+                    {% if cover_letters %}
+                        <div class="list-group list-group-flush">
+                            {% for doc in cover_letters %}
+                            <div class="list-group-item px-0 py-2 border-0">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <div class="fw-semibold text-dark">Version {{ doc.version }}</div>
+                                        <div class="text-muted small" style="font-size: 0.75em;">Model: {{ doc.model_used.split('/')[-1] }}</div>
+                                        <div class="text-muted small" style="font-size: 0.75em;">{{ doc.created_at.strftime('%b %d, %Y') }}</div>
+                                    </div>
+                                    <div class="d-flex gap-1">
+                                        <a href="{{ url_for('main.download_document', doc_id=doc.id) }}" class="btn btn-sm btn-light text-primary" title="Download">
+                                            <i class="fa-solid fa-download"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-light" data-bs-toggle="collapse" data-bs-target="#prompt-cl-{{ doc.id }}" title="Show Prompt Details">
+                                            <i class="fa-solid fa-code"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="collapse mt-2" id="prompt-cl-{{ doc.id }}">
+                                    <div class="bg-dark text-light p-2 rounded small font-monospace" style="max-height: 150px; overflow-y: auto; font-size: 0.75em; white-space: pre-wrap;">
+                                        {{ doc.prompt_used }}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <span class="text-muted small">No cover letters generated yet.</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Status & AI Suite -->
+    <div class="col-lg-5">
+        <!-- Status Panel -->
+        <div class="card border-0 shadow-sm p-4 mb-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-arrow-progress text-primary me-2"></i>Application Status</h5>
+            
+            <div class="d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <span class="text-muted small d-block">Current Stage</span>
+                    <span class="badge-status status-{{ job.status | lower }} fs-6 px-3 py-2 mt-1">{{ job.status }}</span>
+                </div>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#statusModal">
+                    <i class="fa-solid fa-arrows-spin me-1"></i>Change Status
+                </button>
+            </div>
+
+            <!-- Mini timeline -->
+            <div class="border-top pt-3">
+                <div class="fw-semibold text-dark small mb-3">Timeline Details</div>
+                <div class="timeline" style="max-height: 200px; overflow-y: auto;">
+                    {% for item in job.history | sort(attribute='changed_at', reverse=True) %}
+                    <div class="timeline-item mb-3">
+                        <div class="timeline-marker"></div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <span class="badge-status status-{{ item.status | lower }}" style="font-size: 0.7em;">{{ item.status }}</span>
+                                <div class="small mt-1 text-muted">{{ item.notes or 'Status updated.' }}</div>
+                            </div>
+                            <div class="timeline-info">{{ item.changed_at.strftime('%b %d') }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Builder Panel -->
+        <div class="card border-0 shadow-sm p-4 mb-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>Tailoring Suite</h5>
+            
+            <form id="ai-generator-form" action="" method="POST">
+                <div class="mb-3">
+                    <label class="form-label small fw-medium">Select LLM Model</label>
+                    <select id="selected-model" name="model" class="form-select bg-light border-0">
+                        {% for id, name in models %}
+                        <option value="{{ id }}">{{ name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="row g-2">
+                    <div class="col-6">
+                        <button type="submit" onclick="submitAIForm('resume')" class="btn btn-primary w-100 py-2 shadow-sm text-nowrap">
+                            <i class="fa-solid fa-file-invoice-dollar me-1"></i>Tailor CV
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button type="submit" onclick="submitAIForm('coverletter')" class="btn btn-primary w-100 py-2 shadow-sm text-nowrap">
+                            <i class="fa-solid fa-envelope me-1"></i>Write Letter
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- AI Tools Panel (Match score, Interview prep, outreach email) -->
+        <div class="card border-0 shadow-sm p-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-sliders text-primary me-2"></i>AI Career Co-Pilot</h5>
+            
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <button class="btn btn-sm btn-outline-secondary" 
+                        hx-get="{{ url_for('main.match_score', job_id=job.id) }}"
+                        hx-target="#ai-tool-content"
+                        hx-indicator="#ai-loading-indicator"
+                        hx-include="#selected-model">
+                    <i class="fa-solid fa-bullseye me-1"></i>Match Score
+                </button>
+                <button class="btn btn-sm btn-outline-secondary"
+                        hx-get="{{ url_for('main.interview_prep', job_id=job.id) }}"
+                        hx-target="#ai-tool-content"
+                        hx-indicator="#ai-loading-indicator"
+                        hx-include="#selected-model">
+                    <i class="fa-solid fa-user-check me-1"></i>Interview Prep
+                </button>
+                <button class="btn btn-sm btn-outline-secondary"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#emailCollapse">
+                    <i class="fa-solid fa-paper-plane me-1"></i>Outreach Emails
+                </button>
+            </div>
+
+            <!-- Email template options -->
+            <div class="collapse mb-3" id="emailCollapse">
+                <div class="bg-light p-3 rounded">
+                    <form hx-post="{{ url_for('main.email_gen', job_id=job.id) }}" 
+                          hx-target="#ai-tool-content" 
+                          hx-indicator="#ai-loading-indicator">
+                        <input type="hidden" name="model" id="email-hidden-model" value="google/gemini-2.5-flash">
+                        <div class="mb-2">
+                            <label class="form-label small fw-medium">Select Outreach Objective</label>
+                            <select name="email_type" class="form-select form-select-sm">
+                                <option value="Recruiter Follow-up">Recruiter Follow-up</option>
+                                <option value="Post-Interview Thank You">Post-Interview Thank You</option>
+                                <option value="Offer Negotiation">Offer Negotiation</option>
+                                <option value="Application Withdrawal">Application Withdrawal</option>
+                            </select>
+                        </div>
+                        <button type="submit" onclick="syncEmailModel()" class="btn btn-sm btn-primary w-100">Draft Email</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- HTMX Indicator -->
+            <div id="ai-loading-indicator" class="htmx-indicator text-center my-4">
+                <div class="spinner-border text-primary spinner-border-sm" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="text-muted small mt-2">Connecting to OpenRouter. Tailoring response...</div>
+            </div>
+
+            <!-- AI Tool Content Output -->
+            <div id="ai-tool-content" class="bg-light p-3 rounded-3 text-dark small" style="min-height: 150px; max-height: 400px; overflow-y: auto;">
+                <div class="text-center text-muted py-4">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-lg mb-2 text-primary opacity-50"></i>
+                    <p class="mb-0">Select an option above to generate insights dynamically.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Job Modal -->
+<div class="modal fade" id="editJobModal" tabindex="-1" aria-labelledby="editJobModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title fw-bold" id="editJobModalLabel"><i class="fa-solid fa-pen-to-square text-primary me-2"></i>Edit Application</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('main.edit_job', job_id=job.id) }}" method="POST">
+                <div class="modal-body pt-0">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-medium small">Company Name</label>
+                            <input type="text" name="company" class="form-control" value="{{ job.company }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-medium small">Position / Title</label>
+                            <input type="text" name="position" class="form-control" value="{{ job.position }}" required>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-medium small">Location</label>
+                            <input type="text" name="location" class="form-control" value="{{ job.location or '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-medium small">Salary Range</label>
+                            <input type="text" name="salary" class="form-control" value="{{ job.salary or '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-medium small">Job URL</label>
+                            <input type="url" name="job_url" class="form-control" value="{{ job.job_url or '' }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium small">Job Description</label>
+                        <textarea name="job_description" class="form-control font-monospace" rows="5">{{ job.job_description or '' }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-medium small">Personal Notes</label>
+                        <textarea name="notes" class="form-control" rows="2">{{ job.notes or '' }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Status Update Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="statusModalLabel"><i class="fa-solid fa-arrows-spin text-primary me-2"></i>Change Status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{{ url_for('main.update_status', job_id=job.id) }}" method="POST">
+                <div class="modal-body pt-3">
+                    <div class="mb-3">
+                        <label class="form-label small fw-medium">New Status</label>
+                        <select name="status" class="form-select">
+                            {% for st in ['Wishlist', 'Interested', 'Applied', 'OA', 'Recruiter Screen', 'Technical', 'Manager Round', 'Final Round', 'Offer', 'Rejected', 'Withdrawn', 'Ghosted'] %}
+                            <option value="{{ st }}" {% if job.status == st %}selected{% endif %}>{{ st }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-medium">Status Update Notes (Optional)</label>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="e.g. Cleared technical round, scheduled manager interview next week."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Update Status</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Job Modal -->
+<div class="modal fade" id="deleteJobModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>Delete Job Application</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-3">
+                <p>Are you sure you want to delete this job application? This will permanently delete the application details, status timelines, and all generated documents from MinIO storage.</p>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('main.delete_job', job_id=job.id) }}" method="POST">
+                    <button type="submit" class="btn btn-danger">Yes, Delete Application</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function submitAIForm(type) {
+        var form = document.getElementById('ai-generator-form');
+        if (type === 'resume') {
+            form.action = "{{ url_for('main.generate_resume', job_id=job.id) }}";
+        } else {
+            form.action = "{{ url_for('main.generate_cover_letter', job_id=job.id) }}";
+        }
+    }
+    
+    function syncEmailModel() {
+        var selectedModel = document.getElementById('selected-model').value;
+        document.getElementById('email-hidden-model').value = selectedModel;
+    }
+    
+    // Wire parameter mapping for HTMX to include the chosen model
+    document.body.addEventListener('htmx:configRequest', (event) => {
+        var selectedModel = document.getElementById('selected-model').value;
+        event.detail.parameters['model'] = selectedModel;
+    });
+</script>
+{% endblock %}
