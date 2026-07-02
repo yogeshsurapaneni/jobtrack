@@ -16,6 +16,16 @@ class StorageService:
         secure = app.config['MINIO_SECURE']
         self.bucket = app.config['MINIO_BUCKET']
 
+        # The MinIO SDK only accepts "host:port" — strip any scheme (http:// / https://)
+        # and trailing slashes that would cause "path in endpoint is not allowed".
+        if endpoint.startswith('https://'):
+            secure = True
+            endpoint = endpoint[len('https://'):]
+        elif endpoint.startswith('http://'):
+            secure = False
+            endpoint = endpoint[len('http://'):]
+        endpoint = endpoint.rstrip('/')
+
         try:
             # Initialize client
             self.client = Minio(
