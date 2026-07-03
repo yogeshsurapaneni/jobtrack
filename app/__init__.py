@@ -21,10 +21,11 @@ def create_app(config_class=Config):
     from app.routes import main as main_blueprint
     app.register_blueprint(main_blueprint)
 
-    # Create tables and seed data
+    # Create tables, run safe schema migrations, and seed data
     with app.app_context():
         try:
             db.create_all()
+            _run_migrations()
             seed_data()
         except Exception as e:
             print(f"[!] Database connection/seeding failed: {e}")
@@ -33,6 +34,58 @@ def create_app(config_class=Config):
     _start_scheduler(app)
 
     return app
+
+
+def _run_migrations():
+    """
+    Idempotent schema migrations using raw SQL.
+    Safe to run on every startup — uses IF NOT EXISTS / column-existence checks
+    so repeated calls are no-ops.
+    """
+    migrations = [
+        # 1. Create interview_events table if it doesn't already exist
+        """
+        CREATE TABLE IF NOT EXISTS interview_events (
+            id              SERIAL PRIMARY KEY,
+            job_id          INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+            round_name      VARCHAR(100) NOT NULL,
+            scheduled_at    TIMESTAMP,
+            duration_min    INTEGER,
+            meeting_link    VARCHAR(500),
+            career_site_url VARCHAR(500),
+            interviewer     VARCHAR(200),
+            notes           TEXT,
+            created_at      TIMESTAMP DEFAULT NOW()
+        );
+        """,
+        # 2. Add interview_event_id column to application_history if missing
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name='application_history'
+                  AND column_name='interview_event_id'
+            ) THEN
+                ALTER TABLE application_history
+                    ADD COLUMN interview_event_id INTEGER
+                    REFERENCES interview_events(id) ON DELETE SET NULL;
+            END IF;
+        END;
+        $$;
+        """,
+    ]
+
+    with db.engine.connect() as conn:
+        for sql in migrations:
+            try:
+                conn.execute(db.text(sql))
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+                print(f"[!] Migration warning (may be harmless): {e}")
+
+    print("[*] Schema migrations applied.")
 
 
 def _start_scheduler(app):

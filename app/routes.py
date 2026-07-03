@@ -480,8 +480,9 @@ def resume_profile():
         return redirect(url_for('main.resume_profile'))
 
     from app.services.backup import BackupService
+    from flask import current_app
     backups = BackupService.list_backups_in_minio()
-    return render_template('resume.html', profile=profile, backups=backups)
+    return render_template('resume.html', profile=profile, backups=backups, config=current_app.config)
 
 
 # ---------------------------------------------------------------------------
@@ -711,3 +712,63 @@ def backup_github_restore():
     except Exception as e:
         flash(f'GitHub restore failed: {e}', 'danger')
     return redirect(url_for('main.dashboard'))
+
+
+# ---------------------------------------------------------------------------
+# Interview Events (per-job round tracking)
+# ---------------------------------------------------------------------------
+
+@main.route('/jobs/<int:job_id>/interview-events/add', methods=['POST'])
+def add_interview_event(job_id):
+    job = Job.query.get_or_404(job_id)
+
+    round_name      = request.form.get('round_name', '').strip()
+    scheduled_str   = request.form.get('scheduled_at', '').strip()
+    duration_min    = request.form.get('duration_min', '').strip()
+    meeting_link    = request.form.get('meeting_link', '').strip() or None
+    career_site_url = request.form.get('career_site_url', '').strip() or None
+    interviewer     = request.form.get('interviewer', '').strip() or None
+    event_notes     = request.form.get('event_notes', '').strip() or None
+
+    if not round_name:
+        flash('Round type is required.', 'danger')
+        return redirect(url_for('main.job_detail', job_id=job_id))
+
+    scheduled_at = None
+    if scheduled_str:
+        try:
+            scheduled_at = datetime.fromisoformat(scheduled_str)
+        except ValueError:
+            flash('Invalid date/time format.', 'danger')
+            return redirect(url_for('main.job_detail', job_id=job_id))
+
+    dur = None
+    if duration_min:
+        try:
+            dur = int(duration_min)
+        except ValueError:
+            pass
+
+    ev = InterviewEvent(
+        job_id          = job.id,
+        round_name      = round_name,
+        scheduled_at    = scheduled_at,
+        duration_min    = dur,
+        meeting_link    = meeting_link,
+        career_site_url = career_site_url,
+        interviewer     = interviewer,
+        notes           = event_notes,
+    )
+    db.session.add(ev)
+    db.session.commit()
+    flash(f'Interview event "{round_name}" scheduled!', 'success')
+    return redirect(url_for('main.job_detail', job_id=job_id))
+
+
+@main.route('/jobs/<int:job_id>/interview-events/<int:ev_id>/delete', methods=['POST'])
+def delete_interview_event(job_id, ev_id):
+    ev = InterviewEvent.query.filter_by(id=ev_id, job_id=job_id).first_or_404()
+    db.session.delete(ev)
+    db.session.commit()
+    flash('Interview event deleted.', 'info')
+    return redirect(url_for('main.job_detail', job_id=job_id))
