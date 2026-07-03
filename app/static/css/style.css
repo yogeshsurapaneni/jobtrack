@@ -145,11 +145,11 @@ body {
 .status-wishlist { background-color: #f1f5f9; color: #475569; }
 .status-interested { background-color: #eff6ff; color: #1d4ed8; }
 .status-applied { background-color: #e0e7ff; color: #4338ca; }
-.status-oa { background-color: #fff1f2; color: #be123c; }
-.status-recruiter { background-color: #fff7ed; color: #c2410c; }
-.status-technical { background-color: #fef3c7; color: #b45309; }
-.status-manager { background-color: #faf5ff; color: #7e22ce; }
-.status-final { background-color: #f3e8ff; color: #6d28d9; }
+.status-oa, .status-online-assessment { background-color: #fff1f2; color: #be123c; }
+.status-recruiter, .status-phone-screen { background-color: #fff7ed; color: #c2410c; }
+.status-technical, .status-technical-interview { background-color: #fef3c7; color: #b45309; }
+.status-manager, .status-manager-interview { background-color: #faf5ff; color: #7e22ce; }
+.status-final, .status-final-round { background-color: #f3e8ff; color: #6d28d9; }
 .status-offer { background-color: #ecfdf5; color: #047857; }
 .status-rejected { background-color: #fef2f2; color: #b91c1c; }
 .status-withdrawn { background-color: #f8fafc; color: #64748b; }

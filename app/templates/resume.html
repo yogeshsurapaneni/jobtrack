@@ -53,7 +53,7 @@
             </div>
             
             <!-- MinIO Cloud Storage -->
-            <div>
+            <div class="mb-4">
                 <h6 class="fw-bold text-secondary small mb-2">MinIO Cloud Storage</h6>
                 <form action="{{ url_for('main.create_backup') }}" method="POST" class="mb-3">
                     <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fa-solid fa-cloud-arrow-up me-2"></i>Backup Database to MinIO</button>
@@ -61,7 +61,7 @@
                 
                 <label class="form-label small fw-semibold text-muted">Available Backups in MinIO</label>
                 {% if backups %}
-                    <div class="list-group list-group-flush border rounded bg-light mt-1" style="max-height: 250px; overflow-y: auto;">
+                    <div class="list-group list-group-flush border rounded bg-light mt-1" style="max-height: 200px; overflow-y: auto;">
                         {% for backup in backups %}
                         <div class="list-group-item p-2 d-flex justify-content-between align-items-center bg-transparent border-bottom">
                             <div>
@@ -85,6 +85,29 @@
                     </div>
                 {% else %}
                     <p class="text-muted small text-center my-3"><i class="fa-solid fa-folder-open opacity-50 mb-1"></i><br>No cloud backups found.</p>
+                {% endif %}
+            </div>
+
+            <!-- GitHub Backup Storage -->
+            <div>
+                <h6 class="fw-bold text-secondary small mb-2">GitHub Repository Storage</h6>
+                {% if config.GITHUB_TOKEN and config.GITHUB_REPO %}
+                    <form action="{{ url_for('main.backup_github_push') }}" method="POST" class="mb-3">
+                        <button type="submit" class="btn btn-dark btn-sm w-100"><i class="fa-brands fa-github me-2"></i>Backup Database to GitHub</button>
+                    </form>
+                    
+                    <label class="form-label small fw-semibold text-muted">Available Backups in GitHub ({{ config.GITHUB_REPO }})</label>
+                    <div id="github-backups-loader" class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                        <span class="small text-muted ms-2">Fetching backups...</span>
+                    </div>
+                    <div id="github-backups-list" class="list-group list-group-flush border rounded bg-light mt-1 d-none" style="max-height: 200px; overflow-y: auto;">
+                        <!-- Dynamically filled by JS -->
+                    </div>
+                {% else %}
+                    <div class="alert alert-warning py-2 px-3 mb-0" style="font-size:0.8em; border-radius:.5rem;">
+                        <i class="fa-solid fa-circle-info me-1"></i>To enable GitHub backups, configure <code>GITHUB_TOKEN</code> and <code>GITHUB_REPO</code> in your environment.
+                    </div>
                 {% endif %}
             </div>
         </div>
@@ -352,3 +375,55 @@
     </div>
 </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const loader = document.getElementById('github-backups-loader');
+    const list = document.getElementById('github-backups-list');
+    if (!loader || !list) return;
+
+    fetch("{{ url_for('main.backup_github_list') }}")
+        .then(response => response.json())
+        .then(data => {
+            loader.classList.add('d-none');
+            list.classList.remove('d-none');
+            
+            if (data.success && data.backups && data.backups.length > 0) {
+                list.innerHTML = '';
+                data.backups.forEach(backup => {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item p-2 d-flex justify-content-between align-items-center bg-transparent border-bottom';
+                    
+                    const infoDiv = document.createElement('div');
+                    infoDiv.innerHTML = `
+                        <div class="small fw-semibold text-dark text-break" style="font-size: 0.85em;">${backup.filename}</div>
+                        <span class="text-muted" style="font-size: 0.7em;">${backup.size}</span>
+                    `;
+                    
+                    const formDiv = document.createElement('div');
+                    formDiv.innerHTML = `
+                        <form action="{{ url_for('main.backup_github_restore') }}" method="POST" onsubmit="return confirm('WARNING: Restoring this backup will overwrite current database state. Proceed?');">
+                            <input type="hidden" name="path" value="${backup.path}">
+                            <button type="submit" class="btn btn-sm btn-light text-success p-1" title="Restore"><i class="fa-solid fa-rotate-left"></i></button>
+                        </form>
+                    `;
+                    
+                    item.appendChild(infoDiv);
+                    item.appendChild(formDiv);
+                    list.appendChild(item);
+                });
+            } else {
+                list.innerHTML = '<p class="text-muted small text-center my-3"><i class="fa-solid fa-folder-open opacity-50 mb-1"></i><br>No GitHub backups found.</p>';
+            }
+        })
+        .catch(err => {
+            console.error("Failed to load GitHub backups:", err);
+            loader.classList.add('d-none');
+            list.classList.remove('d-none');
+            list.innerHTML = '<p class="text-danger small text-center my-3"><i class="fa-solid fa-circle-exclamation mb-1"></i><br>Failed to fetch backups from GitHub.</p>';
+        });
+});
+</script>
+{% endblock %}
+

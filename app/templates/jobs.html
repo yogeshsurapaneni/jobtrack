@@ -25,7 +25,7 @@
         <div class="col-md-3">
             <select name="status" class="form-select bg-light border-0">
                 <option value="">-- All Statuses --</option>
-                {% for st in ['Wishlist', 'Interested', 'Applied', 'OA', 'Recruiter Screen', 'Technical', 'Manager Round', 'Final Round', 'Offer', 'Rejected', 'Withdrawn', 'Ghosted'] %}
+                {% for st in ['Wishlist', 'Interested', 'Applied', 'Online Assessment', 'Phone Screen', 'Technical Interview', 'Manager Interview', 'Final Round', 'Offer', 'Rejected', 'Withdrawn', 'Ghosted'] %}
                 <option value="{{ st }}" {% if status_filter == st %}selected{% endif %}>{{ st }}</option>
                 {% endfor %}
             </select>
@@ -74,7 +74,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <span class="badge-status status-{{ job.status | lower }}">{{ job.status }}</span>
+                            <span class="badge-status status-{{ job.status | lower | replace(' ', '-') }}">{{ job.status }}</span>
                         </td>
                         <td>{{ job.salary or 'N/A' }}</td>
                         <td class="text-muted small">
@@ -143,10 +143,10 @@
                                 <option value="Wishlist">Wishlist</option>
                                 <option value="Interested">Interested</option>
                                 <option value="Applied">Applied</option>
-                                <option value="OA">OA</option>
-                                <option value="Recruiter Screen">Recruiter Screen</option>
-                                <option value="Technical">Technical</option>
-                                <option value="Manager Round">Manager Round</option>
+                                <option value="Online Assessment">Online Assessment</option>
+                                <option value="Phone Screen">Phone Screen</option>
+                                <option value="Technical Interview">Technical Interview</option>
+                                <option value="Manager Interview">Manager Interview</option>
                                 <option value="Final Round">Final Round</option>
                                 <option value="Offer">Offer</option>
                                 <option value="Rejected">Rejected</option>

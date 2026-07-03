@@ -217,8 +217,8 @@ def job_detail(job_id):
         stored_score = {"score": int(m.group(1)), "grade": m.group(2)}
         notes_clean  = notes_clean[m.end():]
 
-    interview_events = InterviewEvent.query.filter_by(job_id=job.id)\\\
-        .order_by(InterviewEvent.scheduled_at.asc().nullslast()).all()
+    interview_events = (InterviewEvent.query.filter_by(job_id=job.id)
+                        .order_by(InterviewEvent.scheduled_at.asc().nullslast()).all())
 
     return render_template(
         'job_detail.html',
