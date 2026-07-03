@@ -1,216 +1,319 @@
+import io
 import json
+import base64
+import urllib.request
+import urllib.error
 from datetime import datetime, date
-from app.models import db, Job, ApplicationHistory, Document, ResumeProfile
+from app.models import db, Job, ApplicationHistory, Document, ResumeProfile, InterviewEvent
 from app.services.storage import storage_service
+
+
+# ---------------------------------------------------------------------------
+# Core JSON serialisation
+# ---------------------------------------------------------------------------
 
 class BackupService:
     @staticmethod
     def create_backup_json() -> dict:
         """
-        Export all resume profiles, jobs, application histories, and documents
-        into a nested JSON-compatible dictionary format.
+        Export all data into a portable JSON dictionary.
+        Includes: resume profile, jobs, history, documents, and interview events.
         """
-        # 1. Export Resume Profile
         profile = ResumeProfile.query.first()
         profile_data = {}
         if profile:
             profile_data = {
-                "summary": profile.summary,
-                "skills": profile.skills,
-                "experience_json": profile.experience_json,
-                "education_json": profile.education_json,
-                "projects_json": profile.projects_json,
-                "certifications_json": profile.certifications_json
+                "summary":              profile.summary,
+                "skills":               profile.skills,
+                "experience_json":      profile.experience_json,
+                "education_json":       profile.education_json,
+                "projects_json":        profile.projects_json,
+                "certifications_json":  profile.certifications_json,
             }
 
-        # 2. Export Jobs, History, and Documents
         jobs_list = []
-        jobs = Job.query.all()
-        for job in jobs:
-            job_data = {
-                "company": job.company,
-                "position": job.position,
-                "location": job.location,
-                "salary": job.salary,
-                "job_url": job.job_url,
+        for job in Job.query.all():
+            events = []
+            for ev in job.interview_events:
+                events.append({
+                    "round_name":      ev.round_name,
+                    "scheduled_at":    ev.scheduled_at.isoformat() if ev.scheduled_at else None,
+                    "duration_min":    ev.duration_min,
+                    "meeting_link":    ev.meeting_link,
+                    "career_site_url": ev.career_site_url,
+                    "interviewer":     ev.interviewer,
+                    "notes":           ev.notes,
+                })
+
+            history = []
+            for h in job.history:
+                history.append({
+                    "status":     h.status,
+                    "notes":      h.notes,
+                    "changed_at": h.changed_at.isoformat() if h.changed_at else None,
+                })
+
+            docs = []
+            for d in job.documents:
+                docs.append({
+                    "type":        d.type,
+                    "filename":    d.filename,
+                    "minio_path":  d.minio_path,
+                    "version":     d.version,
+                    "model_used":  d.model_used,
+                    "prompt_used": d.prompt_used,
+                    "created_at":  d.created_at.isoformat() if d.created_at else None,
+                })
+
+            jobs_list.append({
+                "company":         job.company,
+                "position":        job.position,
+                "location":        job.location,
+                "salary":          job.salary,
+                "job_url":         job.job_url,
                 "job_description": job.job_description,
-                "status": job.status,
-                "applied_date": job.applied_date.isoformat() if job.applied_date else None,
-                "notes": job.notes,
-                "created_at": job.created_at.isoformat() if job.created_at else None,
-                "updated_at": job.updated_at.isoformat() if job.updated_at else None,
-                "history": [],
-                "documents": []
-            }
+                "status":          job.status,
+                "applied_date":    job.applied_date.isoformat() if job.applied_date else None,
+                "notes":           job.notes,
+                "created_at":      job.created_at.isoformat() if job.created_at else None,
+                "updated_at":      job.updated_at.isoformat() if job.updated_at else None,
+                "interview_events": events,
+                "history":         history,
+                "documents":       docs,
+            })
 
-            # Export history for this job
-            for hist in job.history:
-                job_data["history"].append({
-                    "status": hist.status,
-                    "notes": hist.notes,
-                    "changed_at": hist.changed_at.isoformat() if hist.changed_at else None
-                })
-
-            # Export documents for this job
-            for doc in job.documents:
-                job_data["documents"].append({
-                    "type": doc.type,
-                    "filename": doc.filename,
-                    "minio_path": doc.minio_path,
-                    "version": doc.version,
-                    "model_used": doc.model_used,
-                    "prompt_used": doc.prompt_used,
-                    "created_at": doc.created_at.isoformat() if doc.created_at else None
-                })
-
-            jobs_list.append(job_data)
-
-        # Assemble package
-        backup = {
-            "backup_version": "1.0",
-            "created_at": datetime.utcnow().isoformat(),
+        return {
+            "backup_version": "2.0",
+            "created_at":     datetime.utcnow().isoformat(),
             "resume_profile": profile_data,
-            "jobs": jobs_list
+            "jobs":           jobs_list,
         }
-        return backup
+
+    # ---------------------------------------------------------------------------
+    # MinIO
+    # ---------------------------------------------------------------------------
 
     @classmethod
     def save_backup_to_minio(cls) -> str:
-        """
-        Generate JSON backup and upload it directly to MinIO.
-        """
-        backup_data = cls.create_backup_json()
-        backup_str = json.dumps(backup_data, indent=2)
-        backup_bytes = backup_str.encode('utf-8')
-        
-        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
-        minio_path = f"backups/backup_{timestamp}.json"
-        
-        storage_service.upload_file(
-            minio_path,
-            backup_bytes,
-            content_type="application/json"
-        )
+        """Upload JSON backup to MinIO. Returns the minio_path."""
+        backup_bytes = json.dumps(cls.create_backup_json(), indent=2).encode('utf-8')
+        timestamp    = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        minio_path   = f"backups/backup_{timestamp}.json"
+        storage_service.upload_file(minio_path, backup_bytes, content_type="application/json")
         return minio_path
 
     @staticmethod
     def list_backups_in_minio() -> list:
-        """
-        List all backup JSON files stored in the MinIO bucket.
-        """
         backups = []
         try:
-            # We fetch all objects under prefix "backups/"
             objects = storage_service.client.list_objects(
-                storage_service.bucket_name,
-                prefix="backups/",
-                recursive=True
+                storage_service.bucket_name, prefix="backups/", recursive=True
             )
             for obj in objects:
-                # Format: backups/backup_YYYYMMDD_HHMMSS.json
-                filename = obj.object_name.split('/')[-1]
-                if filename and filename.endswith('.json'):
+                fn = obj.object_name.split('/')[-1]
+                if fn and fn.endswith('.json'):
                     backups.append({
-                        "filename": filename,
-                        "path": obj.object_name,
-                        "size": f"{obj.size / 1024:.2f} KB",
-                        "last_modified": obj.last_modified.strftime('%Y-%m-%d %H:%M:%S') if obj.last_modified else 'N/A'
+                        "filename":      fn,
+                        "path":          obj.object_name,
+                        "size":          f"{obj.size / 1024:.2f} KB",
+                        "last_modified": obj.last_modified.strftime('%Y-%m-%d %H:%M:%S') if obj.last_modified else 'N/A',
+                        "source":        "minio",
                     })
-            # Sort newest first
             backups.sort(key=lambda x: x['filename'], reverse=True)
         except Exception as e:
-            print(f"[!] Error listing backups in MinIO: {e}")
+            print(f"[!] Error listing MinIO backups: {e}")
         return backups
 
     @classmethod
-    def restore_backup_from_json(cls, backup_data: dict):
-        """
-        Given a backup dictionary, wipe the database and reconstruct all models.
-        """
-        # Wipe existing data
-        # Order matters for foreign key constraint cascades
-        ApplicationHistory.query.delete()
-        Document.query.delete()
-        Job.query.delete()
-        ResumeProfile.query.delete()
-        db.session.commit()
-
-        # 1. Restore Resume Profile
-        profile_data = backup_data.get("resume_profile")
-        if profile_data:
-            profile = ResumeProfile(
-                summary=profile_data.get("summary"),
-                skills=profile_data.get("skills"),
-                experience_json=profile_data.get("experience_json"),
-                education_json=profile_data.get("education_json"),
-                projects_json=profile_data.get("projects_json"),
-                certifications_json=profile_data.get("certifications_json")
-            )
-            db.session.add(profile)
-
-        # 2. Restore Jobs, Histories, and Documents
-        for job_data in backup_data.get("jobs", []):
-            applied_date = None
-            if job_data.get("applied_date"):
-                applied_date = date.fromisoformat(job_data["applied_date"])
-
-            job = Job(
-                company=job_data["company"],
-                position=job_data["position"],
-                location=job_data.get("location"),
-                salary=job_data.get("salary"),
-                job_url=job_data.get("job_url"),
-                job_description=job_data.get("job_description"),
-                status=job_data.get("status", "Wishlist"),
-                applied_date=applied_date,
-                notes=job_data.get("notes"),
-                created_at=datetime.fromisoformat(job_data["created_at"]) if job_data.get("created_at") else datetime.utcnow(),
-                updated_at=datetime.fromisoformat(job_data["updated_at"]) if job_data.get("updated_at") else datetime.utcnow()
-            )
-            db.session.add(job)
-            db.session.flush()  # Generates job.id
-
-            # Add History
-            for hist_data in job_data.get("history", []):
-                hist = ApplicationHistory(
-                    job_id=job.id,
-                    status=hist_data["status"],
-                    notes=hist_data.get("notes"),
-                    changed_at=datetime.fromisoformat(hist_data["changed_at"]) if hist_data.get("changed_at") else datetime.utcnow()
-                )
-                db.session.add(hist)
-
-            # Add Documents
-            for doc_data in job_data.get("documents", []):
-                doc = Document(
-                    job_id=job.id,
-                    type=doc_data["type"],
-                    filename=doc_data["filename"],
-                    minio_path=doc_data["minio_path"],
-                    version=doc_data.get("version", 1),
-                    model_used=doc_data.get("model_used"),
-                    prompt_used=doc_data.get("prompt_used"),
-                    created_at=datetime.fromisoformat(doc_data["created_at"]) if doc_data.get("created_at") else datetime.utcnow()
-                )
-                db.session.add(doc)
-
-        db.session.commit()
-
-    @classmethod
     def restore_backup_from_minio(cls, minio_path: str):
-        """
-        Download backup file from MinIO, read JSON and restore db.
-        """
-        file_bytes = storage_service.download_file(minio_path)
+        file_bytes  = storage_service.download_file(minio_path)
         backup_data = json.loads(file_bytes.decode('utf-8'))
         cls.restore_backup_from_json(backup_data)
 
     @staticmethod
     def delete_backup_from_minio(minio_path: str):
+        storage_service.client.remove_object(storage_service.bucket_name, minio_path)
+
+    # ---------------------------------------------------------------------------
+    # GitHub Gist / Repo backup
+    # ---------------------------------------------------------------------------
+
+    @classmethod
+    def _github_api(cls, method: str, url: str, token: str, payload: dict = None) -> dict:
+        """Thin wrapper around urllib for GitHub API calls (no extra deps)."""
+        data = json.dumps(payload).encode('utf-8') if payload else None
+        req  = urllib.request.Request(url, data=data, method=method)
+        req.add_header('Authorization', f'token {token}')
+        req.add_header('Content-Type',  'application/json')
+        req.add_header('Accept',        'application/vnd.github.v3+json')
+        req.add_header('User-Agent',    'CareerOS-Backup/2.0')
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read().decode('utf-8'))
+        except urllib.error.HTTPError as e:
+            body = e.read().decode('utf-8')
+            raise RuntimeError(f"GitHub API {method} {url} → {e.code}: {body}")
+
+    @classmethod
+    def save_backup_to_github(cls, token: str, repo: str) -> str:
         """
-        Delete a backup JSON file from the MinIO bucket.
+        Push a backup JSON as a commit to the GitHub repo at:
+          backups/backup_YYYYMMDD_HHMMSS.json
+
+        repo format: "owner/repo-name"
+        Returns the GitHub commit SHA.
         """
-        storage_service.client.remove_object(
-            storage_service.bucket_name,
-            minio_path
-        )
+        if not token or not repo:
+            raise ValueError("GITHUB_TOKEN and GITHUB_REPO must be configured.")
+
+        content      = json.dumps(cls.create_backup_json(), indent=2)
+        content_b64  = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+        timestamp    = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        path         = f"backups/backup_{timestamp}.json"
+        api_url      = f"https://api.github.com/repos/{repo}/contents/{path}"
+
+        payload = {
+            "message": f"chore: auto-backup {timestamp} (CareerOS)",
+            "content": content_b64,
+        }
+        result = cls._github_api('PUT', api_url, token, payload)
+        sha = result.get('commit', {}).get('sha', 'unknown')
+        print(f"[*] GitHub backup committed: {path} @ {sha}")
+        return sha
+
+    @classmethod
+    def list_backups_in_github(cls, token: str, repo: str) -> list:
+        """List backup files from the GitHub repo's backups/ directory."""
+        if not token or not repo:
+            return []
+        api_url = f"https://api.github.com/repos/{repo}/contents/backups"
+        try:
+            items = cls._github_api('GET', api_url, token)
+            backups = []
+            for item in items:
+                if item.get('name', '').endswith('.json'):
+                    backups.append({
+                        "filename":    item['name'],
+                        "path":        item['path'],
+                        "sha":         item['sha'],
+                        "download_url": item['download_url'],
+                        "size":        f"{item.get('size', 0) / 1024:.2f} KB",
+                        "source":      "github",
+                    })
+            backups.sort(key=lambda x: x['filename'], reverse=True)
+            return backups
+        except Exception as e:
+            print(f"[!] Error listing GitHub backups: {e}")
+            return []
+
+    @classmethod
+    def restore_backup_from_github(cls, token: str, repo: str, path: str):
+        """Download a specific backup file from GitHub and restore the database."""
+        if not token or not repo:
+            raise ValueError("GITHUB_TOKEN and GITHUB_REPO must be configured.")
+        api_url  = f"https://api.github.com/repos/{repo}/contents/{path}"
+        meta     = cls._github_api('GET', api_url, token)
+        raw_b64  = meta.get('content', '')
+        # GitHub returns base64 with newlines; clean them
+        content  = base64.b64decode(raw_b64.replace('\n', '')).decode('utf-8')
+        backup   = json.loads(content)
+        cls.restore_backup_from_json(backup)
+
+    # ---------------------------------------------------------------------------
+    # Combined restore from JSON dict
+    # ---------------------------------------------------------------------------
+
+    @classmethod
+    def restore_backup_from_json(cls, backup_data: dict):
+        """
+        Wipe the database and reconstruct all models from a backup dict.
+        Supports backup_version 1.0 (legacy) and 2.0 (with interview_events).
+        """
+        # Delete in dependency order
+        ApplicationHistory.query.delete()
+        InterviewEvent.query.delete()
+        Document.query.delete()
+        Job.query.delete()
+        ResumeProfile.query.delete()
+        db.session.commit()
+
+        # Restore Resume Profile
+        pd = backup_data.get("resume_profile", {})
+        if pd:
+            db.session.add(ResumeProfile(
+                summary             = pd.get("summary"),
+                skills              = pd.get("skills"),
+                experience_json     = pd.get("experience_json"),
+                education_json      = pd.get("education_json"),
+                projects_json       = pd.get("projects_json"),
+                certifications_json = pd.get("certifications_json"),
+            ))
+
+        # Restore Jobs
+        for jd in backup_data.get("jobs", []):
+            applied_date = None
+            if jd.get("applied_date"):
+                try:
+                    applied_date = date.fromisoformat(jd["applied_date"])
+                except ValueError:
+                    pass
+
+            job = Job(
+                company         = jd["company"],
+                position        = jd["position"],
+                location        = jd.get("location"),
+                salary          = jd.get("salary"),
+                job_url         = jd.get("job_url"),
+                job_description = jd.get("job_description"),
+                status          = jd.get("status", "Wishlist"),
+                applied_date    = applied_date,
+                notes           = jd.get("notes"),
+                created_at      = _parse_dt(jd.get("created_at")),
+                updated_at      = _parse_dt(jd.get("updated_at")),
+            )
+            db.session.add(job)
+            db.session.flush()
+
+            # Interview events (v2.0+)
+            for ev in jd.get("interview_events", []):
+                db.session.add(InterviewEvent(
+                    job_id          = job.id,
+                    round_name      = ev.get("round_name", ""),
+                    scheduled_at    = _parse_dt(ev.get("scheduled_at")),
+                    duration_min    = ev.get("duration_min"),
+                    meeting_link    = ev.get("meeting_link"),
+                    career_site_url = ev.get("career_site_url"),
+                    interviewer     = ev.get("interviewer"),
+                    notes           = ev.get("notes"),
+                ))
+
+            for hd in jd.get("history", []):
+                db.session.add(ApplicationHistory(
+                    job_id     = job.id,
+                    status     = hd["status"],
+                    notes      = hd.get("notes"),
+                    changed_at = _parse_dt(hd.get("changed_at")),
+                ))
+
+            for dd in jd.get("documents", []):
+                db.session.add(Document(
+                    job_id     = job.id,
+                    type       = dd["type"],
+                    filename   = dd["filename"],
+                    minio_path = dd["minio_path"],
+                    version    = dd.get("version", 1),
+                    model_used = dd.get("model_used"),
+                    prompt_used= dd.get("prompt_used"),
+                    created_at = _parse_dt(dd.get("created_at")),
+                ))
+
+        db.session.commit()
+
+
+def _parse_dt(s):
+    if not s:
+        return datetime.utcnow()
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        return datetime.utcnow()

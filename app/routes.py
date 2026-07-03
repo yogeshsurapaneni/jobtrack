@@ -1,7 +1,7 @@
 import json
 import threading
 from flask import Blueprint, render_template, redirect, url_for, request, flash, send_file, jsonify
-from app.models import db, User, Job, ApplicationHistory, Document, ResumeProfile
+from app.models import db, User, Job, ApplicationHistory, Document, ResumeProfile, InterviewEvent
 from app.services.resume_generator import ResumeGeneratorService
 from app.services.coverletter_generator import CoverLetterGeneratorService
 from app.services.storage import storage_service
@@ -59,41 +59,44 @@ def _background_generate(app, job_id):
 def dashboard():
     jobs = Job.query.all()
 
-    total = len(jobs)
+    total      = len(jobs)
     wishlist   = sum(1 for j in jobs if j.status == 'Wishlist')
     interested = sum(1 for j in jobs if j.status == 'Interested')
     applied    = sum(1 for j in jobs if j.status == 'Applied')
 
-    interview_statuses = {'OA', 'Recruiter Screen', 'Technical', 'Manager Round', 'Final Round'}
+    interview_statuses = {
+        'Online Assessment', 'Phone Screen',
+        'Technical Interview', 'Manager Interview', 'Final Round'
+    }
     interviewing = sum(1 for j in jobs if j.status in interview_statuses)
     offers   = sum(1 for j in jobs if j.status == 'Offer')
     rejected = sum(1 for j in jobs if j.status == 'Rejected')
 
     active_statuses_beyond_applied = {
-        'OA', 'Recruiter Screen', 'Technical', 'Manager Round',
-        'Final Round', 'Offer', 'Rejected', 'Withdrawn'
+        'Online Assessment', 'Phone Screen', 'Technical Interview',
+        'Manager Interview', 'Final Round', 'Offer', 'Rejected', 'Withdrawn'
     }
     total_applied_or_more = sum(1 for j in jobs if j.status not in {'Wishlist', 'Interested'})
     positive_responses    = sum(1 for j in jobs if j.status in active_statuses_beyond_applied)
     response_rate = int((positive_responses / total_applied_or_more * 100)) if total_applied_or_more > 0 else 0
 
-    recent_activity = ApplicationHistory.query.order_by(ApplicationHistory.changed_at.desc()).limit(8).all()
-
-    status_counts = {
-        'Wishlist': wishlist, 'Interested': interested, 'Applied': applied,
-        'Interviewing': interviewing, 'Offers': offers, 'Rejected': rejected
-    }
+    recent_activity = ApplicationHistory.query.order_by(ApplicationHistory.changed_at.desc()).limit(12).all()
 
     interview_jobs = [j for j in jobs if j.status in interview_statuses]
     rejected_jobs  = [j for j in jobs if j.status == 'Rejected']
+
+    upcoming_events = InterviewEvent.query\
+        .filter(InterviewEvent.scheduled_at >= datetime.utcnow())\
+        .order_by(InterviewEvent.scheduled_at.asc())\
+        .limit(30).all()
 
     return render_template(
         'dashboard.html',
         total=total, wishlist=wishlist, interested=interested, applied=applied,
         interviewing=interviewing, offers=offers, rejected=rejected,
         response_rate=response_rate, recent_activity=recent_activity,
-        status_counts=status_counts, interview_jobs=interview_jobs,
-        rejected_jobs=rejected_jobs
+        interview_jobs=interview_jobs, rejected_jobs=rejected_jobs,
+        upcoming_events=upcoming_events,
     )
 
 
@@ -214,13 +217,17 @@ def job_detail(job_id):
         stored_score = {"score": int(m.group(1)), "grade": m.group(2)}
         notes_clean  = notes_clean[m.end():]
 
+    interview_events = InterviewEvent.query.filter_by(job_id=job.id)\\\
+        .order_by(InterviewEvent.scheduled_at.asc().nullslast()).all()
+
     return render_template(
         'job_detail.html',
         job=job, notes_clean=notes_clean,
         resume_versions=resume_versions,
         cl_versions=cl_versions,
         stored_score=stored_score,
-        models=models
+        models=models,
+        interview_events=interview_events,
     )
 
 
@@ -592,4 +599,115 @@ def upload_backup():
             flash("Please upload a valid JSON file.", "danger")
     except Exception as e:
         flash(f"Failed to restore backup: {str(e)}", "danger")
+    return redirect(url_for('main.dashboard'))
+
+
+# ---------------------------------------------------------------------------
+# Interview Events Routes
+# ---------------------------------------------------------------------------
+
+INTERVIEW_STATUSES = {
+    'Online Assessment', 'Phone Screen',
+    'Technical Interview', 'Manager Interview', 'Final Round'
+}
+
+@main.route('/jobs/<int:job_id>/interview-event/add', methods=['POST'])
+def add_interview_event(job_id):
+    job = Job.query.get_or_404(job_id)
+    round_name      = request.form.get('round_name', '')
+    scheduled_str   = request.form.get('scheduled_at', '')
+    duration_min    = request.form.get('duration_min')
+    meeting_link    = request.form.get('meeting_link', '')
+    career_site_url = request.form.get('career_site_url', '')
+    interviewer     = request.form.get('interviewer', '')
+    event_notes     = request.form.get('event_notes', '')
+
+    scheduled_at = None
+    if scheduled_str:
+        try:
+            scheduled_at = datetime.strptime(scheduled_str, '%Y-%m-%dT%H:%M')
+        except ValueError:
+            pass
+
+    ev = InterviewEvent(
+        job_id          = job.id,
+        round_name      = round_name,
+        scheduled_at    = scheduled_at,
+        duration_min    = int(duration_min) if duration_min else None,
+        meeting_link    = meeting_link or None,
+        career_site_url = career_site_url or None,
+        interviewer     = interviewer or None,
+        notes           = event_notes or None,
+    )
+    db.session.add(ev)
+
+    # Also record in history if status is interview-like
+    new_status = request.form.get('status') or round_name
+    if new_status and new_status != job.status:
+        old = job.status
+        job.status = new_status
+        hist = ApplicationHistory(
+            job_id = job.id,
+            status = new_status,
+            notes  = f'Interview event added: {round_name}'
+        )
+        db.session.add(hist)
+
+    db.session.commit()
+    flash(f'Interview event "{round_name}" added.', 'success')
+    return redirect(url_for('main.job_detail', job_id=job.id))
+
+
+@main.route('/jobs/<int:job_id>/interview-event/<int:ev_id>/delete', methods=['POST'])
+def delete_interview_event(job_id, ev_id):
+    ev = InterviewEvent.query.get_or_404(ev_id)
+    db.session.delete(ev)
+    db.session.commit()
+    flash('Interview event deleted.', 'info')
+    return redirect(url_for('main.job_detail', job_id=job_id))
+
+
+# ---------------------------------------------------------------------------
+# GitHub Backup Routes
+# ---------------------------------------------------------------------------
+
+@main.route('/backup/github-push', methods=['POST'])
+def backup_github_push():
+    from flask import current_app
+    token = current_app.config.get('GITHUB_TOKEN', '')
+    repo  = current_app.config.get('GITHUB_REPO',  '')
+    try:
+        from app.services.backup import BackupService
+        sha = BackupService.save_backup_to_github(token, repo)
+        flash(f'Backup pushed to GitHub ({repo}) — commit {sha[:8]}.', 'success')
+    except Exception as e:
+        flash(f'GitHub backup failed: {e}', 'danger')
+    return redirect(url_for('main.resume_profile'))
+
+
+@main.route('/backup/github-list')
+def backup_github_list():
+    from flask import current_app
+    token = current_app.config.get('GITHUB_TOKEN', '')
+    repo  = current_app.config.get('GITHUB_REPO',  '')
+    from app.services.backup import BackupService
+    backups = BackupService.list_backups_in_github(token, repo)
+    return jsonify({'success': True, 'backups': backups})
+
+
+@main.route('/backup/github-restore', methods=['POST'])
+def backup_github_restore():
+    from flask import current_app
+    token = current_app.config.get('GITHUB_TOKEN', '')
+    repo  = current_app.config.get('GITHUB_REPO',  '')
+    path  = request.form.get('path', '')
+    if not path:
+        flash('No backup file path provided.', 'danger')
+        return redirect(url_for('main.resume_profile'))
+    try:
+        from app.services.backup import BackupService
+        BackupService.restore_backup_from_github(token, repo, path)
+        flash('Database restored from GitHub backup!', 'success')
+    except Exception as e:
+        flash(f'GitHub restore failed: {e}', 'danger')
     return redirect(url_for('main.dashboard'))

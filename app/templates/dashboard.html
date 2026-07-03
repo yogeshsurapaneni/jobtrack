@@ -1,12 +1,11 @@
 {% extends 'base.html' %}
-
-{% block title %}Dashboard - JobTracker{% endblock %}
+{% block title %}Dashboard - CareerOS{% endblock %}
 
 {% block content %}
 <div class="row align-items-center mb-4 g-3">
     <div class="col-md-8">
         <h2 class="fw-bold text-dark mb-1">Career Dashboard</h2>
-        <p class="text-muted mb-0">Track your applications, analyze stats, and generate optimized AI documents.</p>
+        <p class="text-muted mb-0">Track your applications, interview schedules, and AI-driven insights.</p>
     </div>
     <div class="col-md-4 text-md-end">
         <a href="{{ url_for('main.jobs_list') }}" class="btn btn-primary shadow-sm">
@@ -15,180 +14,207 @@
     </div>
 </div>
 
-<!-- Metrics Cards Row -->
+<!-- ── Metric Cards ── -->
 <div class="row row-cols-2 row-cols-md-3 row-cols-lg-6 g-3 mb-4">
     <div class="col">
         <div class="card border-0 shadow-sm stat-card stat-primary">
-            <div class="icon-wrapper bg-primary-subtle text-primary">
-                <i class="fa-solid fa-briefcase"></i>
-            </div>
-            <div class="text-muted small fw-medium">Total Jobs</div>
+            <div class="icon-wrapper bg-primary-subtle text-primary"><i class="fa-solid fa-briefcase"></i></div>
+            <div class="text-muted small fw-medium">Total</div>
             <div class="fs-3 fw-bold mt-1 text-dark">{{ total }}</div>
         </div>
     </div>
     <div class="col">
         <div class="card border-0 shadow-sm stat-card stat-purple">
-            <div class="icon-wrapper bg-indigo-subtle text-indigo" style="color: #4f46e5;">
-                <i class="fa-solid fa-file-export"></i>
-            </div>
+            <div class="icon-wrapper" style="background:#e0e7ff;color:#4338ca;width:44px;height:44px;border-radius:.75rem;display:flex;align-items:center;justify-content:center;font-size:1.2rem;margin-bottom:1rem;"><i class="fa-solid fa-file-export"></i></div>
             <div class="text-muted small fw-medium">Applied</div>
             <div class="fs-3 fw-bold mt-1 text-dark">{{ applied }}</div>
         </div>
     </div>
     <div class="col">
         <div class="card border-0 shadow-sm stat-card stat-warning">
-            <div class="icon-wrapper bg-warning-subtle text-warning">
-                <i class="fa-regular fa-comments"></i>
-            </div>
+            <div class="icon-wrapper bg-warning-subtle text-warning"><i class="fa-regular fa-comments"></i></div>
             <div class="text-muted small fw-medium">Interviewing</div>
             <div class="fs-3 fw-bold mt-1 text-dark">{{ interviewing }}</div>
         </div>
     </div>
     <div class="col">
         <div class="card border-0 shadow-sm stat-card stat-success">
-            <div class="icon-wrapper bg-success-subtle text-success">
-                <i class="fa-solid fa-trophy"></i>
-            </div>
+            <div class="icon-wrapper bg-success-subtle text-success"><i class="fa-solid fa-trophy"></i></div>
             <div class="text-muted small fw-medium">Offers</div>
             <div class="fs-3 fw-bold mt-1 text-dark">{{ offers }}</div>
         </div>
     </div>
     <div class="col">
         <div class="card border-0 shadow-sm stat-card stat-danger">
-            <div class="icon-wrapper bg-danger-subtle text-danger">
-                <i class="fa-solid fa-ban"></i>
-            </div>
+            <div class="icon-wrapper bg-danger-subtle text-danger"><i class="fa-solid fa-ban"></i></div>
             <div class="text-muted small fw-medium">Rejected</div>
             <div class="fs-3 fw-bold mt-1 text-dark">{{ rejected }}</div>
         </div>
     </div>
     <div class="col">
         <div class="card border-0 shadow-sm stat-card stat-info">
-            <div class="icon-wrapper bg-info-subtle text-info">
-                <i class="fa-solid fa-bullseye"></i>
-            </div>
+            <div class="icon-wrapper bg-info-subtle text-info"><i class="fa-solid fa-bullseye"></i></div>
             <div class="text-muted small fw-medium">Response Rate</div>
             <div class="fs-3 fw-bold mt-1 text-dark">{{ response_rate }}%</div>
         </div>
     </div>
 </div>
 
+<!-- ── Row 2: Upcoming Interviews + Rejection Post-Mortems ── -->
 <div class="row g-4 mb-4">
-    <!-- Active Interview Pipelines -->
-    <div class="col-lg-6">
+
+    <!-- Upcoming Interview Schedule -->
+    <div class="col-lg-7">
         <div class="card border-0 shadow-sm h-100 p-4">
-            <h5 class="fw-bold mb-3"><i class="fa-solid fa-comments me-2 text-warning"></i>Active Interview Pipelines</h5>
-            <p class="text-muted small mb-3">Applications with upcoming interview rounds or tests.</p>
-            
-            {% if interview_jobs %}
-            <div class="list-group list-group-flush">
-                {% for job in interview_jobs %}
-                <a href="{{ url_for('main.job_detail', job_id=job.id) }}" class="list-group-item list-group-item-action border-0 px-0 py-3 d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="fw-bold text-dark mb-1">{{ job.position }}</div>
-                        <div class="text-muted small"><i class="fa-solid fa-building me-1"></i>{{ job.company }}</div>
-                    </div>
-                    <div>
-                        <span class="badge-status status-{{ job.status | lower }}">{{ job.status }}</span>
-                    </div>
-                </a>
-                {% endfor %}
+            <h5 class="fw-bold mb-3">
+                <i class="fa-solid fa-calendar-days me-2 text-primary"></i>Upcoming Interview Schedule
+            </h5>
+            {% if upcoming_events %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" style="font-size:0.88em;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Date &amp; Time</th>
+                            <th>Round</th>
+                            <th>Company / Role</th>
+                            <th>Links</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ev in upcoming_events %}
+                        <tr>
+                            <td class="text-nowrap fw-semibold text-dark">
+                                {% if ev.scheduled_at %}
+                                    {{ ev.scheduled_at.strftime('%b %d, %Y') }}<br>
+                                    <span class="text-muted" style="font-size:0.85em;">{{ ev.scheduled_at.strftime('%I:%M %p') }} UTC</span>
+                                    {% if ev.duration_min %}
+                                    <span class="text-muted" style="font-size:0.75em;"> · {{ ev.duration_min }}min</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">TBD</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge-status status-{{ ev.round_name | lower | replace(' ', '-') }}">{{ ev.round_name }}</span>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('main.job_detail', job_id=ev.job_id) }}" class="text-decoration-none fw-semibold text-dark">
+                                    {{ ev.job.company }}
+                                </a>
+                                <div class="text-muted" style="font-size:0.8em;">{{ ev.job.position }}</div>
+                                {% if ev.interviewer %}
+                                <div class="text-muted" style="font-size:0.78em;"><i class="fa-solid fa-user me-1"></i>{{ ev.interviewer }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-nowrap">
+                                {% if ev.meeting_link %}
+                                <a href="{{ ev.meeting_link }}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2 me-1" title="Join meeting">
+                                    <i class="fa-solid fa-video me-1"></i>Join
+                                </a>
+                                {% endif %}
+                                {% if ev.career_site_url %}
+                                <a href="{{ ev.career_site_url }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Career page">
+                                    <i class="fa-solid fa-globe me-1"></i>JD
+                                </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
             {% else %}
             <div class="text-center py-5 text-muted">
-                <i class="fa-regular fa-calendar-check fa-2x mb-3 opacity-50"></i>
-                <p class="small mb-0">No active interviews currently. Keep applying!</p>
+                <i class="fa-regular fa-calendar fa-2x mb-3 opacity-50"></i>
+                <p class="small mb-0">No upcoming interviews scheduled.<br>Add interview events from a job detail page.</p>
             </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Rejection Post-Mortems & Gaps -->
-    <div class="col-lg-6">
-        <div class="card border-0 shadow-sm h-100 p-4" style="border-top: 4px solid var(--bs-danger) !important;">
-            <h5 class="fw-bold mb-3 text-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>Rejection Post-Mortems & Gaps</h5>
-            <p class="text-muted small mb-3">Review AI rejection analysis and skill upgrades for these applications.</p>
-            
+    <!-- Rejection Post-Mortems -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm h-100 p-4" style="border-top:4px solid #ef4444!important;">
+            <h5 class="fw-bold mb-3 text-danger">
+                <i class="fa-solid fa-triangle-exclamation me-2"></i>Rejection Post-Mortems
+            </h5>
+            <p class="text-muted small mb-3">Click any entry to view AI gap analysis & skill upgrade plan.</p>
             {% if rejected_jobs %}
             <div class="list-group list-group-flush">
                 {% for job in rejected_jobs %}
-                <a href="{{ url_for('main.job_detail', job_id=job.id) }}" class="list-group-item list-group-item-action border-0 px-0 py-3 d-flex justify-content-between align-items-center">
+                <a href="{{ url_for('main.job_detail', job_id=job.id) }}"
+                   class="list-group-item list-group-item-action border-0 px-0 py-3 d-flex justify-content-between align-items-center">
                     <div>
                         <div class="fw-bold text-dark mb-1">{{ job.company }}</div>
                         <div class="text-muted small">{{ job.position }}</div>
                     </div>
-                    <div class="text-end">
-                        <span class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size: 0.72em;">
-                            <i class="fa-solid fa-lightbulb me-1"></i>Gaps Analysis
-                        </span>
-                    </div>
+                    <span class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:0.72em;">
+                        <i class="fa-solid fa-lightbulb me-1"></i>Gaps
+                    </span>
                 </a>
                 {% endfor %}
             </div>
             {% else %}
             <div class="text-center py-5 text-muted">
                 <i class="fa-regular fa-thumbs-up fa-2x mb-3 opacity-50 text-success"></i>
-                <p class="small mb-0">No rejections tracked yet. Good luck!</p>
+                <p class="small mb-0">No rejections yet — keep going! 🎯</p>
             </div>
             {% endif %}
         </div>
     </div>
 </div>
 
+<!-- ── Row 3: Active Pipeline + Recent Activity (big) ── -->
 <div class="row g-4">
-    <!-- Pipeline Chart Column -->
-    <div class="col-lg-6">
+
+    <!-- Active Interview Pipelines -->
+    <div class="col-lg-4">
         <div class="card border-0 shadow-sm h-100 p-4">
-            <h5 class="fw-bold mb-4"><i class="fa-solid fa-chart-simple me-2 text-primary"></i>Application Funnel</h5>
-            
-            {% set pipeline = [
-                ('Wishlist', status_counts.Wishlist, '#cbd5e1'),
-                ('Interested', status_counts.Interested, '#60a5fa'),
-                ('Applied', status_counts.Applied, '#818cf8'),
-                ('Interviewing', status_counts.Interviewing, '#f59e0b'),
-                ('Offers', status_counts.Offers, '#34d399'),
-                ('Rejected', status_counts.Rejected, '#f87171')
-            ] %}
-            
-            {% for name, count, color in pipeline %}
-            {% set pct = (count / total * 100) if total > 0 else 0 %}
-            <div class="mb-4">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="fw-semibold small">{{ name }}</span>
-                    <span class="badge text-dark bg-light font-monospace">{{ count }}</span>
-                </div>
-                <div class="progress rounded-pill" style="height: 10px;">
-                    <div class="progress-bar rounded-pill" role="progressbar" 
-                          style="width: {{ pct }}%; background-color: {{ color }};" 
-                          aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
-                </div>
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-comments me-2 text-warning"></i>Active Pipelines</h5>
+            {% if interview_jobs %}
+            <div class="list-group list-group-flush">
+                {% for job in interview_jobs %}
+                <a href="{{ url_for('main.job_detail', job_id=job.id) }}"
+                   class="list-group-item list-group-item-action border-0 px-0 py-2 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold text-dark" style="font-size:0.92em;">{{ job.position }}</div>
+                        <div class="text-muted" style="font-size:0.78em;"><i class="fa-solid fa-building me-1"></i>{{ job.company }}</div>
+                    </div>
+                    <span class="badge-status status-{{ job.status | lower | replace(' ', '-') }}">{{ job.status }}</span>
+                </a>
+                {% endfor %}
             </div>
-            {% endfor %}
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fa-regular fa-calendar-check fa-2x mb-3 opacity-50"></i>
+                <p class="small mb-0">No active interview loops yet.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 
-    <!-- Recent Activity Timeline Column -->
-    <div class="col-lg-6">
+    <!-- Recent Activity — full-height, bigger -->
+    <div class="col-lg-8">
         <div class="card border-0 shadow-sm h-100 p-4">
             <h5 class="fw-bold mb-4"><i class="fa-solid fa-history me-2 text-primary"></i>Recent Activity</h5>
-            
             {% if recent_activity %}
-            <div class="timeline">
+            <div class="timeline" style="max-height:520px;overflow-y:auto;">
                 {% for log in recent_activity %}
                 <div class="timeline-item">
                     <div class="timeline-marker"></div>
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <span class="fw-bold text-dark">{{ log.job.company }}</span>
-                            <span class="text-muted small">({{ log.job.position }})</span>
+                            <a href="{{ url_for('main.job_detail', job_id=log.job_id) }}"
+                               class="fw-bold text-dark text-decoration-none">{{ log.job.company }}</a>
+                            <span class="text-muted small ms-1">({{ log.job.position }})</span>
                             <div class="small mt-1 text-muted">
-                                Status changed to: <span class="badge-status status-{{ log.status | lower }}">{{ log.status }}</span>
+                                → <span class="badge-status status-{{ log.status | lower | replace(' ', '-') }}">{{ log.status }}</span>
                             </div>
-                            {% if log.notes %}
-                            <div class="small text-muted mt-1 italic border-start ps-2">"{{ log.notes }}"</div>
+                            {% if log.notes and not log.notes.startswith('Interview event') %}
+                            <div class="small text-muted mt-1 fst-italic border-start border-2 ps-2">"{{ log.notes }}"</div>
                             {% endif %}
                         </div>
-                        <div class="timeline-info">{{ log.changed_at.strftime('%b %d, %H:%M') }}</div>
+                        <div class="timeline-info text-nowrap">{{ log.changed_at.strftime('%b %d, %H:%M') }}</div>
                     </div>
                 </div>
                 {% endfor %}
@@ -196,7 +222,7 @@
             {% else %}
             <div class="text-center py-5 text-muted">
                 <i class="fa-regular fa-folder-open fa-2x mb-3 opacity-50"></i>
-                <p>No recent activity. Try adding a job or updating status!</p>
+                <p>No recent activity yet.</p>
             </div>
             {% endif %}
         </div>

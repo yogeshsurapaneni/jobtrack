@@ -29,24 +29,48 @@ class Job(db.Model):
     salary = db.Column(db.String(100), nullable=True)
     job_url = db.Column(db.String(500), nullable=True)
     job_description = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(50), default='Wishlist')  # Wishlist, Interested, Applied, OA, Recruiter Screen, Technical, Manager Round, Final Round, Offer, Rejected, Withdrawn, Ghosted
+    status = db.Column(db.String(50), default='Wishlist')
+    # Valid statuses: Wishlist | Interested | Applied | Online Assessment | Phone Screen |
+    #   Technical Interview | Manager Interview | Final Round | Offer | Rejected | Withdrawn | Ghosted
     applied_date = db.Column(db.Date, nullable=True)
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    history = db.relationship('ApplicationHistory', backref='job', lazy=True, cascade="all, delete-orphan")
-    documents = db.relationship('Document', backref='job', lazy=True, cascade="all, delete-orphan")
+    history          = db.relationship('ApplicationHistory', backref='job', lazy=True, cascade="all, delete-orphan")
+    documents        = db.relationship('Document',           backref='job', lazy=True, cascade="all, delete-orphan")
+    interview_events = db.relationship('InterviewEvent',     back_populates='job',     lazy=True, cascade="all, delete-orphan")
+
+class InterviewEvent(db.Model):
+    """Structured metadata for a specific interview round."""
+    __tablename__ = 'interview_events'
+
+    id              = db.Column(db.Integer, primary_key=True)
+    job_id          = db.Column(db.Integer, db.ForeignKey('jobs.id'), nullable=False)
+    round_name      = db.Column(db.String(100), nullable=False)   # e.g. "Phone Screen"
+    scheduled_at    = db.Column(db.DateTime, nullable=True)        # date + time
+    duration_min    = db.Column(db.Integer,  nullable=True)        # duration in minutes
+    meeting_link    = db.Column(db.String(500), nullable=True)     # Zoom / Teams / Google Meet
+    career_site_url = db.Column(db.String(500), nullable=True)     # company careers page
+    interviewer     = db.Column(db.String(200), nullable=True)     # name / email
+    notes           = db.Column(db.Text, nullable=True)
+    created_at      = db.Column(db.DateTime, default=datetime.utcnow)
+
+    job = db.relationship('Job', back_populates='interview_events')
+
 
 class ApplicationHistory(db.Model):
     __tablename__ = 'application_history'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    job_id = db.Column(db.Integer, db.ForeignKey('jobs.id'), nullable=False)
-    status = db.Column(db.String(50), nullable=False)
-    changed_at = db.Column(db.DateTime, default=datetime.utcnow)
-    notes = db.Column(db.Text, nullable=True)
+
+    id                 = db.Column(db.Integer, primary_key=True)
+    job_id             = db.Column(db.Integer, db.ForeignKey('jobs.id'), nullable=False)
+    status             = db.Column(db.String(50), nullable=False)
+    changed_at         = db.Column(db.DateTime, default=datetime.utcnow)
+    notes              = db.Column(db.Text, nullable=True)
+    interview_event_id = db.Column(db.Integer, db.ForeignKey('interview_events.id'), nullable=True)
+
+    interview_event = db.relationship('InterviewEvent', foreign_keys=[interview_event_id])
 
 class Document(db.Model):
     __tablename__ = 'documents'

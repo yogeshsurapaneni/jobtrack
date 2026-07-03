@@ -4,6 +4,7 @@ from app.models import db, User, ResumeProfile
 from app.services.storage import storage_service
 from flask_migrate import Migrate
 
+
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -14,14 +15,13 @@ def create_app(config_class=Config):
 
     # Initialize services
     with app.app_context():
-        # Initialize MinIO client & bucket
         storage_service.init_app(app)
 
     # Register blueprints/routes
     from app.routes import main as main_blueprint
     app.register_blueprint(main_blueprint)
 
-    # Create tables and seed data if not present
+    # Create tables and seed data
     with app.app_context():
         try:
             db.create_all()
@@ -29,18 +29,69 @@ def create_app(config_class=Config):
         except Exception as e:
             print(f"[!] Database connection/seeding failed: {e}")
 
+    # Start the daily backup scheduler
+    _start_scheduler(app)
+
     return app
 
+
+def _start_scheduler(app):
+    """
+    Registers a daily APScheduler job that:
+      1. Saves a backup to MinIO (always).
+      2. Pushes the same backup to GitHub (if GITHUB_TOKEN + GITHUB_REPO are set).
+    Fires at BACKUP_HOUR UTC (default 02:00).
+    Safe to call multiple times — the scheduler is only started once.
+    """
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+    except ImportError:
+        print("[!] APScheduler not installed — daily backup disabled. "
+              "Add 'APScheduler' to requirements.txt.")
+        return
+
+    backup_hour  = app.config.get('BACKUP_HOUR', 2)
+    github_token = app.config.get('GITHUB_TOKEN', '')
+    github_repo  = app.config.get('GITHUB_REPO',  '')
+
+    def run_daily_backup():
+        from app.services.backup import BackupService
+        with app.app_context():
+            # 1. MinIO
+            try:
+                path = BackupService.save_backup_to_minio()
+                print(f"[*] Scheduled backup → MinIO: {path}")
+            except Exception as e:
+                print(f"[!] Scheduled MinIO backup failed: {e}")
+
+            # 2. GitHub (optional)
+            if github_token and github_repo:
+                try:
+                    sha = BackupService.save_backup_to_github(github_token, github_repo)
+                    print(f"[*] Scheduled backup → GitHub ({github_repo}): {sha}")
+                except Exception as e:
+                    print(f"[!] Scheduled GitHub backup failed: {e}")
+
+    scheduler = BackgroundScheduler(daemon=True)
+    scheduler.add_job(
+        run_daily_backup,
+        trigger=CronTrigger(hour=backup_hour, minute=0),
+        id='daily_backup',
+        replace_existing=True,
+    )
+    scheduler.start()
+    print(f"[*] Daily backup scheduler started — fires at {backup_hour:02d}:00 UTC.")
+
+
 def seed_data():
-    # Seed default user if not exists
     if not User.query.filter_by(email='demo@example.com').first():
         user = User(email='demo@example.com', name='Demo User')
         user.set_password('password')
         db.session.add(user)
         db.session.commit()
         print("[*] Seeded default user: demo@example.com / password")
-        
-    # Seed default resume profile if none exists
+
     if not ResumeProfile.query.first():
         profile = ResumeProfile(
             summary="Senior Software Engineer with 6+ years of experience building scalable backend APIs, microservices, and distributed cloud applications. Proficient in Python, Go, and AWS cloud infrastructures.",
