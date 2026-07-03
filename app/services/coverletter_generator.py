@@ -8,7 +8,7 @@ from app.services.resume_generator import slugify
 
 class CoverLetterGeneratorService:
     @classmethod
-    def generate_cover_letter(cls, job_id, model=None):
+    def generate_cover_letter(cls, job_id, model=None, additional_notes=None):
         """
         Generates and stores a cover letter tailored to the job description.
         """
@@ -48,6 +48,12 @@ class CoverLetterGeneratorService:
             f"Task: Generate a customized 1-page Cover Letter in Markdown format.\n"
             f"Include proper business letter formatting at the top (Date, Applicant Details, Recipient Details if known, Salutation) followed by an engaging introduction, body paragraphs mapping achievements, and a strong conclusion."
         )
+
+        if additional_notes:
+            user_prompt += (
+                f"\n\nADDITIONAL INSTRUCTIONS FROM THE USER (FOLLOW THESE STRICTLY):\n"
+                f"{additional_notes}\n"
+            )
         
         messages = [
             {"role": "system", "content": system_prompt},

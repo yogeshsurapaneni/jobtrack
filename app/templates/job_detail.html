@@ -70,6 +70,21 @@
          style="white-space:pre-wrap;">{{ notes_clean or 'No personal notes.' }}</p>
     </div>
 
+    <!-- Rejection Analysis Card -->
+    {% if job.status == 'Rejected' %}
+    <div class="card border-0 shadow-sm p-4 mb-4" style="border-left: 4px solid #ef4444 !important;">
+      <h5 class="fw-bold mb-3 text-danger">
+        <i class="fa-solid fa-circle-exclamation me-2"></i>Rejection & Skill Improvement Analysis
+      </h5>
+      <div id="rejection-loading" class="text-center py-4">
+        <div class="spinner-border text-danger spinner-border-sm" role="status"></div>
+        <div class="text-muted small mt-2">Analyzing rejection gaps & improvements...</div>
+      </div>
+      <div id="rejection-content" class="bg-light p-3 rounded-3 text-dark small d-none" style="max-height: 400px; overflow-y: auto; line-height: 1.6;">
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Documents Card -->
     <div class="card border-0 shadow-sm p-4">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -175,16 +190,23 @@
 
       <!-- Manual Re-generate strip -->
       <div class="border-top mt-3 pt-3">
-        <form id="ai-generator-form" action="" method="POST" class="d-flex flex-wrap gap-2 align-items-center">
+        <form id="ai-generator-form" action="" method="POST">
           <input type="hidden" id="regen-model" name="model" value="google/gemini-2.5-flash">
-          <button type="submit" onclick="submitAIForm('resume')"
-                  class="btn btn-sm btn-outline-dark text-nowrap">
-            <i class="fa-solid fa-rotate me-1"></i>Re-generate CV
-          </button>
-          <button type="submit" onclick="submitAIForm('coverletter')"
-                  class="btn btn-sm btn-outline-dark text-nowrap">
-            <i class="fa-solid fa-rotate me-1"></i>Re-generate Letter
-          </button>
+          <div class="mb-3">
+            <label class="form-label small fw-medium text-secondary">Custom Prompt Instructions (Optional)</label>
+            <textarea name="additional_notes" id="regen-notes" class="form-control form-control-sm" rows="2" 
+                      placeholder="e.g. 'Focus heavily on GCP and architecture', 'Emphasize Python over Go', 'Limit to one page'"></textarea>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" onclick="submitAIForm('resume')"
+                    class="btn btn-sm btn-outline-dark text-nowrap flex-fill">
+              <i class="fa-solid fa-rotate me-1"></i>Re-generate CV
+            </button>
+            <button type="submit" onclick="submitAIForm('coverletter')"
+                    class="btn btn-sm btn-outline-dark text-nowrap flex-fill">
+              <i class="fa-solid fa-rotate me-1"></i>Re-generate Letter
+            </button>
+          </div>
         </form>
       </div>
 
@@ -292,6 +314,11 @@
             <option value="Offer Negotiation">Offer Negotiation</option>
             <option value="Application Withdrawal">Application Withdrawal</option>
           </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-medium text-secondary">Custom Prompt Notes (Optional)</label>
+          <textarea name="additional_notes" id="email-notes" class="form-control form-control-sm" rows="2"
+                    placeholder="e.g. 'Mention my negotiation points', 'Ask for a call on Friday morning'"></textarea>
         </div>
         <button type="button" class="btn btn-sm btn-primary w-100" onclick="generateEmail()">
           <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Draft Full Email
@@ -517,6 +544,7 @@ window.addEventListener('load', function() {
 function generateEmail() {
   var emailType = document.getElementById('email-type').value;
   var model     = document.getElementById('selected-model')?.value || 'google/gemini-2.5-flash';
+  var additionalNotes = document.getElementById('email-notes')?.value || '';
 
   document.getElementById('email-loading').classList.remove('d-none');
   document.getElementById('email-output').classList.add('d-none');
@@ -524,6 +552,7 @@ function generateEmail() {
   var formData = new FormData();
   formData.append('email_type', emailType);
   formData.append('model', model);
+  formData.append('additional_notes', additionalNotes);
 
   fetch("{{ url_for('main.email_gen', job_id=job.id) }}", {
     method: 'POST',
@@ -547,9 +576,44 @@ function copyEmail() {
   var raw = document.getElementById('email-raw').value;
   navigator.clipboard.writeText(raw).then(() => {
     var btn = event.target.closest('button');
+    var oldText = btn.innerHTML;
     btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Copied!';
-    setTimeout(() => { btn.innerHTML = '<i class="fa-solid fa-copy me-1"></i>Copy'; }, 2000);
+    setTimeout(() => { btn.innerHTML = oldText; }, 2000);
   });
 }
+
+// ── Rejection Analysis ───────────────────────────────────────────────────
+function loadRejectionAnalysis() {
+  var model = document.getElementById('selected-model')?.value || 'google/gemini-2.5-flash';
+  var loading = document.getElementById('rejection-loading');
+  var content = document.getElementById('rejection-content');
+  if (!loading) return;
+
+  fetch("{{ url_for('main.rejection_analysis', job_id=job.id) }}?model=" + encodeURIComponent(model))
+    .then(r => r.json())
+    .then(res => {
+      loading.classList.add('d-none');
+      if (res.success) {
+        content.innerHTML = res.html;
+        content.classList.remove('d-none');
+      } else {
+        loading.innerHTML = '<div class="text-danger small">Failed to load rejection analysis.</div>';
+        loading.classList.remove('d-none');
+      }
+    })
+    .catch(() => {
+      if (loading) {
+        loading.innerHTML = '<div class="text-danger small">Failed to load rejection analysis.</div>';
+        loading.classList.remove('d-none');
+      }
+    });
+}
+
+{% if job.status == 'Rejected' %}
+window.addEventListener('load', function() {
+  setTimeout(loadRejectionAnalysis, 1500);
+});
+{% endif %}
+
 </script>
 {% endblock %}

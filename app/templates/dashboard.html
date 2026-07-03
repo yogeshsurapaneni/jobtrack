@@ -16,9 +16,9 @@
 </div>
 
 <!-- Metrics Cards Row -->
-<div class="row row-cols-2 row-cols-md-3 row-cols-lg-6 g-3 mb-5">
+<div class="row row-cols-2 row-cols-md-3 row-cols-lg-6 g-3 mb-4">
     <div class="col">
-        <div class="card border-0 shadow-sm stat-card">
+        <div class="card border-0 shadow-sm stat-card stat-primary">
             <div class="icon-wrapper bg-primary-subtle text-primary">
                 <i class="fa-solid fa-briefcase"></i>
             </div>
@@ -27,8 +27,8 @@
         </div>
     </div>
     <div class="col">
-        <div class="card border-0 shadow-sm stat-card">
-            <div class="icon-wrapper bg-indigo-subtle" style="background-color: #e0e7ff; color: #4338ca;">
+        <div class="card border-0 shadow-sm stat-card stat-purple">
+            <div class="icon-wrapper bg-indigo-subtle text-indigo" style="color: #4f46e5;">
                 <i class="fa-solid fa-file-export"></i>
             </div>
             <div class="text-muted small fw-medium">Applied</div>
@@ -36,7 +36,7 @@
         </div>
     </div>
     <div class="col">
-        <div class="card border-0 shadow-sm stat-card">
+        <div class="card border-0 shadow-sm stat-card stat-warning">
             <div class="icon-wrapper bg-warning-subtle text-warning">
                 <i class="fa-regular fa-comments"></i>
             </div>
@@ -45,7 +45,7 @@
         </div>
     </div>
     <div class="col">
-        <div class="card border-0 shadow-sm stat-card">
+        <div class="card border-0 shadow-sm stat-card stat-success">
             <div class="icon-wrapper bg-success-subtle text-success">
                 <i class="fa-solid fa-trophy"></i>
             </div>
@@ -54,7 +54,7 @@
         </div>
     </div>
     <div class="col">
-        <div class="card border-0 shadow-sm stat-card">
+        <div class="card border-0 shadow-sm stat-card stat-danger">
             <div class="icon-wrapper bg-danger-subtle text-danger">
                 <i class="fa-solid fa-ban"></i>
             </div>
@@ -63,12 +63,74 @@
         </div>
     </div>
     <div class="col">
-        <div class="card border-0 shadow-sm stat-card">
+        <div class="card border-0 shadow-sm stat-card stat-info">
             <div class="icon-wrapper bg-info-subtle text-info">
                 <i class="fa-solid fa-bullseye"></i>
             </div>
             <div class="text-muted small fw-medium">Response Rate</div>
             <div class="fs-3 fw-bold mt-1 text-dark">{{ response_rate }}%</div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Active Interview Pipelines -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100 p-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-comments me-2 text-warning"></i>Active Interview Pipelines</h5>
+            <p class="text-muted small mb-3">Applications with upcoming interview rounds or tests.</p>
+            
+            {% if interview_jobs %}
+            <div class="list-group list-group-flush">
+                {% for job in interview_jobs %}
+                <a href="{{ url_for('main.job_detail', job_id=job.id) }}" class="list-group-item list-group-item-action border-0 px-0 py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold text-dark mb-1">{{ job.position }}</div>
+                        <div class="text-muted small"><i class="fa-solid fa-building me-1"></i>{{ job.company }}</div>
+                    </div>
+                    <div>
+                        <span class="badge-status status-{{ job.status | lower }}">{{ job.status }}</span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fa-regular fa-calendar-check fa-2x mb-3 opacity-50"></i>
+                <p class="small mb-0">No active interviews currently. Keep applying!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Rejection Post-Mortems & Gaps -->
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100 p-4" style="border-top: 4px solid var(--bs-danger) !important;">
+            <h5 class="fw-bold mb-3 text-danger"><i class="fa-solid fa-triangle-exclamation me-2"></i>Rejection Post-Mortems & Gaps</h5>
+            <p class="text-muted small mb-3">Review AI rejection analysis and skill upgrades for these applications.</p>
+            
+            {% if rejected_jobs %}
+            <div class="list-group list-group-flush">
+                {% for job in rejected_jobs %}
+                <a href="{{ url_for('main.job_detail', job_id=job.id) }}" class="list-group-item list-group-item-action border-0 px-0 py-3 d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-bold text-dark mb-1">{{ job.company }}</div>
+                        <div class="text-muted small">{{ job.position }}</div>
+                    </div>
+                    <div class="text-end">
+                        <span class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size: 0.72em;">
+                            <i class="fa-solid fa-lightbulb me-1"></i>Gaps Analysis
+                        </span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fa-regular fa-thumbs-up fa-2x mb-3 opacity-50 text-success"></i>
+                <p class="small mb-0">No rejections tracked yet. Good luck!</p>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -97,8 +159,8 @@
                 </div>
                 <div class="progress rounded-pill" style="height: 10px;">
                     <div class="progress-bar rounded-pill" role="progressbar" 
-                         style="width: {{ pct }}%; background-color: {{ color }};" 
-                         aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
+                          style="width: {{ pct }}%; background-color: {{ color }};" 
+                          aria-valuenow="{{ count }}" aria-valuemin="0" aria-valuemax="{{ total }}"></div>
                 </div>
             </div>
             {% endfor %}

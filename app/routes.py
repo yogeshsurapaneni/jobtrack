@@ -84,12 +84,16 @@ def dashboard():
         'Interviewing': interviewing, 'Offers': offers, 'Rejected': rejected
     }
 
+    interview_jobs = [j for j in jobs if j.status in interview_statuses]
+    rejected_jobs  = [j for j in jobs if j.status == 'Rejected']
+
     return render_template(
         'dashboard.html',
         total=total, wishlist=wishlist, interested=interested, applied=applied,
         interviewing=interviewing, offers=offers, rejected=rejected,
         response_rate=response_rate, recent_activity=recent_activity,
-        status_counts=status_counts
+        status_counts=status_counts, interview_jobs=interview_jobs,
+        rejected_jobs=rejected_jobs
     )
 
 
@@ -283,8 +287,9 @@ def delete_job(job_id):
 @main.route('/jobs/<int:job_id>/generate-resume', methods=['POST'])
 def generate_resume(job_id):
     model = request.form.get('model')
+    additional_notes = request.form.get('additional_notes')
     try:
-        pdf_doc = ResumeGeneratorService.generate_tailored_resume(job_id, model=model)
+        pdf_doc = ResumeGeneratorService.generate_tailored_resume(job_id, model=model, additional_notes=additional_notes)
         flash(f"Tailored Resume v{pdf_doc.version} generated successfully!", "success")
     except Exception as e:
         flash(f"Failed to generate resume: {str(e)}", "danger")
@@ -294,8 +299,9 @@ def generate_resume(job_id):
 @main.route('/jobs/<int:job_id>/generate-coverletter', methods=['POST'])
 def generate_cover_letter(job_id):
     model = request.form.get('model')
+    additional_notes = request.form.get('additional_notes')
     try:
-        pdf_doc = CoverLetterGeneratorService.generate_cover_letter(job_id, model=model)
+        pdf_doc = CoverLetterGeneratorService.generate_cover_letter(job_id, model=model, additional_notes=additional_notes)
         flash(f"Tailored Cover Letter v{pdf_doc.version} generated successfully!", "success")
     except Exception as e:
         flash(f"Failed to generate cover letter: {str(e)}", "danger")
@@ -330,13 +336,27 @@ def match_score(job_id):
 def email_gen(job_id):
     model      = request.form.get('model')
     email_type = request.form.get('email_type')
+    additional_notes = request.form.get('additional_notes')
     try:
-        email_text = AIAnalysisService.generate_email_template(job_id, email_type, model=model)
+        email_text = AIAnalysisService.generate_email_template(job_id, email_type, model=model, additional_notes=additional_notes)
         import markdown as md_lib
         html_email = md_lib.markdown(email_text)
         return jsonify({"success": True, "html": html_email, "raw": email_text})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@main.route('/jobs/<int:job_id>/rejection-analysis')
+def rejection_analysis(job_id):
+    model = request.args.get('model')
+    try:
+        analysis = AIAnalysisService.analyze_rejection(job_id, model=model)
+        import markdown as md_lib
+        html_analysis = md_lib.markdown(analysis)
+        return jsonify({"success": True, "html": html_analysis})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 
 # ---------------------------------------------------------------------------

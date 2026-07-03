@@ -69,7 +69,7 @@ class AIAnalysisService:
             }
 
     @classmethod
-    def generate_email_template(cls, job_id, email_type, model=None):
+    def generate_email_template(cls, job_id, email_type, model=None, additional_notes=None):
         """
         Generates a detailed, professional outreach email with full body.
         Returns the email as markdown text.
@@ -105,6 +105,9 @@ class AIAnalysisService:
             f"Do NOT use generic placeholder text. Make it feel personal and specific."
         )
 
+        if additional_notes:
+            user_prompt += f"\n\nADDITIONAL USER INSTRUCTIONS (FOLLOW THESE STRICTLY):\n{additional_notes}\n"
+
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": user_prompt}
@@ -112,3 +115,41 @@ class AIAnalysisService:
 
         email_text, model_used = OpenRouterService.generate_completion(messages, model)
         return email_text
+
+    @classmethod
+    def analyze_rejection(cls, job_id, model=None):
+        """
+        Analyzes the candidate's resume profile against the job description for a rejected application.
+        Identifies key skill gaps, resume weakness, and provides a clear skill-up path.
+        """
+        job = Job.query.get(job_id)
+        if not job:
+            raise ValueError(f"Job with ID {job_id} not found.")
+
+        profile = ResumeProfile.query.first()
+        profile_markdown = ResumeGeneratorService.format_profile_to_markdown(profile) if profile else ""
+
+        system_prompt = (
+            "You are an expert technical interviewer, talent acquisition manager, and career coach.\n"
+            "Analyze the candidate's resume profile against the job description for a rejected application.\n"
+            "Format the output strictly in beautiful, readable Markdown.\n"
+            "Provide:\n"
+            "1. **Rejection Post-Mortem**: Constructive analysis of what parts of the profile were likely weaker compared to the job description (e.g. experience gap, missing keywords).\n"
+            "2. **Specific Skill Gaps & Improvements**: Actionable libraries, frameworks, tools, or certifications to acquire next to qualify for similar roles.\n"
+            "3. **Resume Optimization Tips**: Concrete advice on how to rewrite or emphasize achievements for future similar roles."
+        )
+
+        user_prompt = (
+            f"Resume Profile:\n{profile_markdown}\n\n"
+            f"Job Details: {job.position} at {job.company}\n"
+            f"Description:\n{job.job_description or 'No description provided.'}\n\n"
+            "Generate a detailed, constructive rejection analysis and skill improvement guide."
+        )
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt}
+        ]
+
+        analysis, model_used = OpenRouterService.generate_completion(messages, model)
+        return analysis

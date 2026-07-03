@@ -73,14 +73,9 @@ class ResumeGeneratorService:
         return "\n".join(md)
 
     @classmethod
-    def generate_tailored_resume(cls, job_id, model=None):
+    def generate_tailored_resume(cls, job_id, model=None, additional_notes=None):
         """
         Orchestrates resume tailoring flow.
-        1. Fetch Job and ResumeProfile.
-        2. Generate Prompt.
-        3. Call OpenRouter.
-        4. Render to PDF/DOCX.
-        5. Store in MinIO and register in DB.
         """
         job = Job.query.get(job_id)
         if not job:
@@ -100,7 +95,7 @@ class ResumeGeneratorService:
             "1. Use ONLY information from the Master Resume Profile — never fabricate dates, companies, titles, or metrics.\n"
             "2. Maximize keyword density from the Job Description naturally woven into bullet points.\n"
             "3. Use strong action verbs to start every bullet (Architected, Engineered, Delivered, Led, Reduced, Increased, etc.).\n"
-            "4. Each bullet must start with '- ' on its own line. Never embed bullets inside a paragraph.\n"
+            "4. Each bullet point MUST be on its own line and start with a hyphen space ('- '). Never output bullet points inline or on a single line separated by asterisks or dashes. Never output a paragraph containing asterisks or dashes as lists. Every single bullet point must start on a brand new line.\n"
             "5. Quantify achievements wherever the profile provides numbers (%, $, users, latency, etc.).\n"
             "6. Keep to 1-2 pages maximum. Omit irrelevant experience sections if needed.\n"
             "7. Output ONLY clean standard Markdown. No HTML, no tables, no custom characters.\n"
@@ -129,8 +124,14 @@ class ResumeGeneratorService:
             f"6. '## Projects' (if relevant)\n"
             f"7. '## Education'\n"
             f"8. '## Certifications' (if any)\n"
-            f"Ensure every bullet starts on its own line with '- '."
+            f"Ensure every single bullet starts on a brand new line with '- '."
         )
+
+        if additional_notes:
+            user_prompt += (
+                f"\n\nADDITIONAL INSTRUCTIONS / KEYWORD REQUESTS FROM THE USER (FOLLOW THESE STRICTLY):\n"
+                f"{additional_notes}\n"
+            )
         
         messages = [
             {"role": "system", "content": system_prompt},

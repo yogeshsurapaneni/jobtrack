@@ -3,10 +3,81 @@ import re
 import markdown
 import weasyprint
 import docx
-from docx.shared import Pt, Inches, RGBColor, Twips
+from docx.shared import Pt, Inches, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
+
+
+# ---------------------------------------------------------------------------
+# Preprocessor for list formatting
+# ---------------------------------------------------------------------------
+
+def preprocess_markdown_lists(text):
+    """
+    Normalizes markdown text by splitting inline continuous bullet points (e.g. * A * B)
+    into line-by-line formatting, and ensures there is a blank line before any list
+    block starts so standard markdown parsers render it as a <ul>/<li> block.
+    """
+    if not text:
+        return ""
+    
+    # 1. Normalize line endings
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    
+    # 2. Split lines containing multiple bullet points inline
+    lines = text.split('\n')
+    processed_lines = []
+    
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            processed_lines.append(line)
+            continue
+            
+        # Match ' * ' or ' - ' or ' • ' (surrounded by space) but avoid splitting '**'
+        parts = re.split(r'\s+[\-\*\u2022]\s+', line)
+        if len(parts) > 1:
+            starts_with_bullet = line.lstrip().startswith('* ') or line.lstrip().startswith('- ') or line.lstrip().startswith('• ')
+            for i, part in enumerate(parts):
+                part_stripped = part.strip()
+                if not part_stripped:
+                    continue
+                if i == 0 and not starts_with_bullet:
+                    processed_lines.append(part)
+                else:
+                    # Clean any trailing/leading asterisks from split points
+                    processed_lines.append(f"- {part_stripped}")
+        else:
+            # Also handle if bullet markers are like "*Point A *Point B" (no space before bullet)
+            # but avoid breaking bold markers. Match " *[a-zA-Z]" or " -[a-zA-Z]"
+            sub_parts = re.split(r'\s+[\-\*\u2022](?=[a-zA-Z0-9])', line)
+            if len(sub_parts) > 1:
+                starts_with_bullet = line.lstrip().startswith('*') or line.lstrip().startswith('-') or line.lstrip().startswith('•')
+                for i, part in enumerate(sub_parts):
+                    part_stripped = part.strip()
+                    if not part_stripped:
+                        continue
+                    if i == 0 and not starts_with_bullet:
+                        processed_lines.append(part)
+                    else:
+                        processed_lines.append(f"- {part_stripped}")
+            else:
+                processed_lines.append(line)
+                
+    # 3. Ensure list block starts are preceded by a blank line
+    final_lines = []
+    for i, line in enumerate(processed_lines):
+        stripped = line.strip()
+        is_bullet = stripped.startswith('- ') or stripped.startswith('* ') or stripped.startswith('• ') or re.match(r'^\d+\.\s+', stripped)
+        if is_bullet and i > 0:
+            prev_stripped = final_lines[-1].strip()
+            prev_is_bullet = prev_stripped.startswith('- ') or prev_stripped.startswith('* ') or prev_stripped.startswith('• ') or re.match(r'^\d+\.\s+', prev_stripped)
+            if prev_stripped and not prev_is_bullet:
+                final_lines.append('')
+        final_lines.append(line)
+        
+    return '\n'.join(final_lines)
 
 
 # ---------------------------------------------------------------------------
@@ -18,9 +89,9 @@ def markdown_to_pdf(md_text):
     Converts markdown text to PDF bytes using WeasyPrint.
     Renders a polished, ATS-ready, print-quality document.
     """
-    # Pre-process: convert lines starting with "- " or "* " that are inside
-    # a paragraph block (no blank line before) into actual list items so the
-    # markdown parser sees them correctly.
+    # Normalize bullet points and line-by-line format first
+    md_text = preprocess_markdown_lists(md_text)
+    
     html_body = markdown.markdown(
         md_text,
         extensions=['tables', 'nl2br']
@@ -177,6 +248,7 @@ def markdown_to_docx(md_text):
     Converts markdown to a professionally styled DOCX file.
     Bullet alignment is correct via proper hanging-indent paragraph format.
     """
+    md_text = preprocess_markdown_lists(md_text)
     doc = docx.Document()
 
     # Margins
@@ -205,7 +277,6 @@ def markdown_to_docx(md_text):
     for line in lines:
         stripped = line.rstrip()
         if not stripped:
-            # Add minimal spacing paragraph
             _add_empty_para(doc)
             continue
 
@@ -301,7 +372,6 @@ def _add_bullet(doc, text):
     p = doc.add_paragraph(style='List Bullet')
     p.paragraph_format.space_before = Pt(0)
     p.paragraph_format.space_after  = Pt(2)
-    # Hanging indent: left=0.25in, first_line=-0.25in gives correct bullet hang
     p.paragraph_format.left_indent        = Inches(0.25)
     p.paragraph_format.first_line_indent  = Inches(-0.25)
     _parse_inline(p, text)
