@@ -94,28 +94,42 @@ class ResumeGeneratorService:
         
         # Define prompts
         system_prompt = (
-            "You are an executive resume writer for the US technology market.\n"
-            "Optimize for ATS compatibility, readability, and impact.\n"
-            "Do not fabricate experience, credentials, or dates. Tailor wording and focus, but keep it honest.\n"
-            "Prioritize matching keywords from the job description naturally.\n"
-            "Keep formatting clean, professional, and standard. Avoid custom characters/tables.\n"
-            "Output valid, standard Markdown format only."
+            "You are an elite executive resume writer for the US technology market.\n"
+            "Your goal: produce the BEST possible ATS-optimized resume that maximizes interview callbacks.\n\n"
+            "STRICT RULES:\n"
+            "1. Use ONLY information from the Master Resume Profile — never fabricate dates, companies, titles, or metrics.\n"
+            "2. Maximize keyword density from the Job Description naturally woven into bullet points.\n"
+            "3. Use strong action verbs to start every bullet (Architected, Engineered, Delivered, Led, Reduced, Increased, etc.).\n"
+            "4. Each bullet must start with '- ' on its own line. Never embed bullets inside a paragraph.\n"
+            "5. Quantify achievements wherever the profile provides numbers (%, $, users, latency, etc.).\n"
+            "6. Keep to 1-2 pages maximum. Omit irrelevant experience sections if needed.\n"
+            "7. Output ONLY clean standard Markdown. No HTML, no tables, no custom characters.\n"
+            "8. Section headers must use '## ' prefix exactly (e.g. '## Professional Experience').\n"
+            "9. Job entry sub-headers: '### Position | Company' on one line, then '#### Location | Start – End' below it."
         )
-        
+
         user_prompt = (
-            f"Here is my Master Resume Profile:\n"
-            f"=================================\n"
+            f"MASTER RESUME PROFILE:\n"
+            f"{'='*60}\n"
             f"{profile_markdown}\n"
-            f"=================================\n\n"
-            f"Here is the Job Description:\n"
+            f"{'='*60}\n\n"
+            f"TARGET JOB DESCRIPTION:\n"
             f"Company: {job.company}\n"
             f"Position: {job.position}\n"
-            f"Location: {job.location or 'N/A'}\n"
+            f"Location: {job.location or 'Not specified'}\n"
             f"Description:\n{job.job_description or 'No description provided.'}\n"
-            f"=================================\n\n"
-            f"Task: Generate an ATS-tailored resume in Markdown based ONLY on the details in my Master Resume Profile.\n"
-            f"Focus on highlighting my experience that matches the Job Description. Keep the resume to at most 2 pages.\n"
-            f"Always start the output with a centered header containing name, contact details (email, phone, location, LinkedIn) at the very top. Use standard headers like '## Professional Experience', '## Skills', etc."
+            f"{'='*60}\n\n"
+            f"TASK: Generate the best possible ATS-tailored resume in Markdown using ONLY the profile above.\n"
+            f"Structure:\n"
+            f"1. Start with '# Full Name' (centered via h1)\n"
+            f"2. Next line: contact info paragraph (email | phone | location | LinkedIn)\n"
+            f"3. '## Summary' — 2-3 sentence value proposition targeting this specific role\n"
+            f"4. '## Skills' — comma-separated or pipe-separated, grouped by category\n"
+            f"5. '## Professional Experience' — each role as ### Position | Company, then #### Location | Dates, then bullet points\n"
+            f"6. '## Projects' (if relevant)\n"
+            f"7. '## Education'\n"
+            f"8. '## Certifications' (if any)\n"
+            f"Ensure every bullet starts on its own line with '- '."
         )
         
         messages = [

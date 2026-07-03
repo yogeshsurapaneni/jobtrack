@@ -3,192 +3,340 @@ import re
 import markdown
 import weasyprint
 import docx
-from docx.shared import Pt, Inches
+from docx.shared import Pt, Inches, RGBColor, Twips
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
+
+
+# ---------------------------------------------------------------------------
+# PDF renderer
+# ---------------------------------------------------------------------------
 
 def markdown_to_pdf(md_text):
     """
-    Converts markdown text to PDF bytes using WeasyPrint with executive-style CSS.
+    Converts markdown text to PDF bytes using WeasyPrint.
+    Renders a polished, ATS-ready, print-quality document.
     """
-    # Parse markdown to HTML
-    html_body = markdown.markdown(md_text)
-    
-    # Wrap in standard professional print template
-    full_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <style>
-            @page {{
-                size: letter;
-                margin: 0.75in 0.75in 0.75in 0.75in;
-                @bottom-right {{
-                    content: counter(page);
-                    font-family: Arial, sans-serif;
-                    font-size: 8pt;
-                    color: #718096;
-                }}
-            }}
-            body {{
-                font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
-                font-size: 10pt;
-                line-height: 1.45;
-                color: #2d3748;
-                margin: 0;
-                padding: 0;
-            }}
-            h1 {{
-                text-align: center;
-                font-size: 18pt;
-                margin-top: 0;
-                margin-bottom: 6px;
-                color: #1a202c;
-                font-weight: bold;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }}
-            h2 {{
-                font-size: 12pt;
-                color: #2b6cb0; /* Sleek Slate Blue */
-                border-bottom: 1.5px solid #2b6cb0;
-                padding-bottom: 2px;
-                margin-top: 16px;
-                margin-bottom: 8px;
-                text-transform: uppercase;
-                font-weight: bold;
-            }}
-            h3 {{
-                font-size: 10.5pt;
-                margin-top: 10px;
-                margin-bottom: 4px;
-                color: #1a202c;
-                font-weight: bold;
-            }}
-            p {{
-                margin-top: 0;
-                margin-bottom: 6px;
-            }}
-            ul {{
-                margin-top: 0;
-                margin-bottom: 8px;
-                padding-left: 18px;
-            }}
-            li {{
-                margin-bottom: 3px;
-            }}
-            strong {{
-                font-weight: bold;
-                color: #1a202c;
-            }}
-            em {{
-                font-style: italic;
-            }}
-            hr {{
-                border: 0;
-                border-top: 1px solid #e2e8f0;
-                margin: 10px 0;
-            }}
-            /* Header/Contact paragraph styling */
-            p.contact-header {{
-                text-align: center;
-                font-size: 9pt;
-                color: #4a5568;
-                margin-bottom: 12px;
-                line-height: 1.2;
-            }}
-        </style>
-    </head>
-    <body>
-        {html_body}
-    </body>
-    </html>
-    """
-    
-    # WeasyPrint renders the HTML to a PDF byte stream
+    # Pre-process: convert lines starting with "- " or "* " that are inside
+    # a paragraph block (no blank line before) into actual list items so the
+    # markdown parser sees them correctly.
+    html_body = markdown.markdown(
+        md_text,
+        extensions=['tables', 'nl2br']
+    )
+
+    full_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  /* ── Page setup ── */
+  @page {{
+    size: letter;
+    margin: 0.65in 0.7in 0.65in 0.7in;
+    @bottom-center {{
+      content: counter(page) " of " counter(pages);
+      font-family: 'Arial', sans-serif;
+      font-size: 7.5pt;
+      color: #9ca3af;
+    }}
+  }}
+
+  /* ── Base typography ── */
+  body {{
+    font-family: 'Arial', 'Helvetica Neue', Helvetica, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    color: #1f2937;
+    margin: 0;
+    padding: 0;
+  }}
+
+  /* ── Name / H1 ── */
+  h1 {{
+    text-align: center;
+    font-size: 22pt;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 4px 0;
+    padding: 0;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }}
+
+  /* ── Section headers / H2 ── */
+  h2 {{
+    font-size: 10pt;
+    font-weight: 700;
+    color: #1d4ed8;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 18px 0 4px 0;
+    padding-bottom: 3px;
+    border-bottom: 1.5px solid #1d4ed8;
+  }}
+
+  /* ── Job title / H3 ── */
+  h3 {{
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #111827;
+    margin: 10px 0 2px 0;
+  }}
+
+  /* ── H4 — date/location metadata ── */
+  h4 {{
+    font-size: 9.5pt;
+    font-weight: 400;
+    color: #6b7280;
+    margin: 0 0 4px 0;
+  }}
+
+  /* ── Body paragraphs ── */
+  p {{
+    margin: 0 0 5px 0;
+    line-height: 1.5;
+  }}
+
+  /* ── Bullet lists — properly indented ── */
+  ul {{
+    margin: 2px 0 6px 0;
+    padding-left: 0;
+    list-style: none;
+  }}
+  ul li {{
+    position: relative;
+    padding-left: 14px;
+    margin-bottom: 3px;
+    line-height: 1.45;
+    text-align: left;
+  }}
+  ul li::before {{
+    content: "\\2022";   /* bullet */
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: #1d4ed8;
+    font-weight: 700;
+  }}
+
+  /* Nested lists */
+  ul ul {{
+    margin-top: 2px;
+    padding-left: 14px;
+  }}
+
+  /* ── Horizontal rule ── */
+  hr {{
+    border: none;
+    border-top: 1px solid #e5e7eb;
+    margin: 10px 0;
+  }}
+
+  /* ── Inline formatting ── */
+  strong {{ font-weight: 700; color: #111827; }}
+  em {{ font-style: italic; color: #374151; }}
+
+  /* ── Contact line (centered, small) ── */
+  p:first-of-type,
+  .contact {{
+    text-align: center;
+    font-size: 9pt;
+    color: #4b5563;
+    margin-bottom: 10px;
+  }}
+
+  /* ── Tables (for skill grids, if any) ── */
+  table {{
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+    font-size: 10pt;
+  }}
+  td, th {{
+    padding: 3px 6px;
+    vertical-align: top;
+  }}
+</style>
+</head>
+<body>
+{html_body}
+</body>
+</html>"""
+
     return weasyprint.HTML(string=full_html).write_pdf()
+
+
+# ---------------------------------------------------------------------------
+# DOCX renderer
+# ---------------------------------------------------------------------------
 
 def markdown_to_docx(md_text):
     """
-    Converts markdown text to a professional DOCX file.
+    Converts markdown to a professionally styled DOCX file.
+    Bullet alignment is correct via proper hanging-indent paragraph format.
     """
     doc = docx.Document()
-    
-    # Set 1-inch margins
-    for section in doc.sections:
-        section.top_margin = Inches(1)
-        section.bottom_margin = Inches(1)
-        section.left_margin = Inches(1)
-        section.right_margin = Inches(1)
-        
-    # Configure base font styles
-    style = doc.styles['Normal']
-    font = style.font
-    font.name = 'Arial'
-    font.size = Pt(10.5)
-    font.color.rgb = docx.shared.RGBColor(45, 55, 72) # #2d3748
-    
-    lines = md_text.split('\n')
-    for line in lines:
-        line_str = line.strip()
-        if not line_str:
-            continue
-            
-        # Parse titles and sections
-        if line_str.startswith('# '):
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.add_run(line_str[2:])
-            run.font.size = Pt(18)
-            run.font.bold = True
-            p.paragraph_format.space_before = Pt(0)
-            p.paragraph_format.space_after = Pt(8)
-            
-        elif line_str.startswith('## '):
-            p = doc.add_paragraph()
-            run = p.add_run(line_str[3:])
-            run.font.size = Pt(13)
-            run.font.bold = True
-            run.font.color.rgb = docx.shared.RGBColor(43, 108, 176) # #2b6cb0 (Slate Blue)
-            p.paragraph_format.space_before = Pt(14)
-            p.paragraph_format.space_after = Pt(6)
-            
-        elif line_str.startswith('### '):
-            p = doc.add_paragraph()
-            run = p.add_run(line_str[4:])
-            run.font.size = Pt(11)
-            run.font.bold = True
-            p.paragraph_format.space_before = Pt(8)
-            p.paragraph_format.space_after = Pt(4)
-            
-        elif line_str.startswith('- ') or line_str.startswith('* '):
-            p = doc.add_paragraph(style='List Bullet')
-            text_content = line_str[2:]
-            _parse_inline_docx_formatting(p, text_content)
-            p.paragraph_format.space_after = Pt(3)
-            
-        else:
-            p = doc.add_paragraph()
-            _parse_inline_docx_formatting(p, line_str)
-            p.paragraph_format.space_after = Pt(6)
-            
-    # Save to a byte stream
-    file_stream = io.BytesIO()
-    doc.save(file_stream)
-    file_stream.seek(0)
-    return file_stream.read()
 
-def _parse_inline_docx_formatting(paragraph, text):
-    """
-    Helper to parse markdown bold (**) and italic (*) in paragraphs
-    """
-    # Regex to split on bold/italic markers
+    # Margins
+    for section in doc.sections:
+        section.top_margin    = Inches(0.75)
+        section.bottom_margin = Inches(0.75)
+        section.left_margin   = Inches(0.85)
+        section.right_margin  = Inches(0.85)
+
+    # Base Normal style
+    normal = doc.styles['Normal']
+    normal.font.name = 'Arial'
+    normal.font.size = Pt(10.5)
+    normal.font.color.rgb = RGBColor(31, 41, 55)   # #1f2937
+
+    # Ensure List Bullet style exists and is tuned
+    try:
+        bullet_style = doc.styles['List Bullet']
+    except KeyError:
+        bullet_style = doc.styles.add_style('List Bullet', docx.enum.style.WD_STYLE_TYPE.PARAGRAPH)
+    bullet_style.font.name = 'Arial'
+    bullet_style.font.size = Pt(10.5)
+
+    lines = md_text.split('\n')
+
+    for line in lines:
+        stripped = line.rstrip()
+        if not stripped:
+            # Add minimal spacing paragraph
+            _add_empty_para(doc)
+            continue
+
+        if stripped.startswith('# '):
+            _add_h1(doc, stripped[2:])
+        elif stripped.startswith('## '):
+            _add_h2(doc, stripped[3:])
+        elif stripped.startswith('### '):
+            _add_h3(doc, stripped[4:])
+        elif stripped.startswith('#### '):
+            _add_h4(doc, stripped[5:])
+        elif stripped.startswith('- ') or stripped.startswith('* '):
+            _add_bullet(doc, stripped[2:])
+        elif stripped.startswith('---') or stripped.startswith('***'):
+            _add_hr(doc)
+        else:
+            _add_body(doc, stripped)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+    return buf.read()
+
+
+# ---------------------------------------------------------------------------
+# DOCX helpers
+# ---------------------------------------------------------------------------
+
+def _add_empty_para(doc):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after  = Pt(3)
+
+
+def _add_h1(doc, text):
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after  = Pt(4)
+    run = p.add_run(text.upper())
+    run.font.name  = 'Arial'
+    run.font.size  = Pt(20)
+    run.font.bold  = True
+    run.font.color.rgb = RGBColor(17, 24, 39)
+
+
+def _add_h2(doc, text):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(14)
+    p.paragraph_format.space_after  = Pt(3)
+    run = p.add_run(text.upper())
+    run.font.name  = 'Arial'
+    run.font.size  = Pt(10)
+    run.font.bold  = True
+    run.font.color.rgb = RGBColor(29, 78, 216)   # #1d4ed8
+
+    # Add bottom border via XML
+    pPr = p._p.get_or_add_pPr()
+    pBdr = OxmlElement('w:pBdr')
+    bottom = OxmlElement('w:bottom')
+    bottom.set(qn('w:val'), 'single')
+    bottom.set(qn('w:sz'), '8')        # 0.5pt
+    bottom.set(qn('w:space'), '3')
+    bottom.set(qn('w:color'), '1d4ed8')
+    pBdr.append(bottom)
+    pPr.append(pBdr)
+
+
+def _add_h3(doc, text):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(8)
+    p.paragraph_format.space_after  = Pt(2)
+    run = p.add_run(text)
+    run.font.name  = 'Arial'
+    run.font.size  = Pt(10.5)
+    run.font.bold  = True
+    run.font.color.rgb = RGBColor(17, 24, 39)
+
+
+def _add_h4(doc, text):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after  = Pt(2)
+    run = p.add_run(text)
+    run.font.name   = 'Arial'
+    run.font.size   = Pt(9.5)
+    run.font.italic = True
+    run.font.color.rgb = RGBColor(107, 114, 128)
+
+
+def _add_bullet(doc, text):
+    """Bullet with proper hanging indent."""
+    p = doc.add_paragraph(style='List Bullet')
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after  = Pt(2)
+    # Hanging indent: left=0.25in, first_line=-0.25in gives correct bullet hang
+    p.paragraph_format.left_indent        = Inches(0.25)
+    p.paragraph_format.first_line_indent  = Inches(-0.25)
+    _parse_inline(p, text)
+
+
+def _add_body(doc, text):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after  = Pt(4)
+    _parse_inline(p, text)
+
+
+def _add_hr(doc):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(6)
+    p.paragraph_format.space_after  = Pt(6)
+    pPr = p._p.get_or_add_pPr()
+    pBdr = OxmlElement('w:pBdr')
+    bottom = OxmlElement('w:bottom')
+    bottom.set(qn('w:val'), 'single')
+    bottom.set(qn('w:sz'), '6')
+    bottom.set(qn('w:space'), '1')
+    bottom.set(qn('w:color'), 'e5e7eb')
+    pBdr.append(bottom)
+    pPr.append(pBdr)
+
+
+def _parse_inline(paragraph, text):
+    """Parse **bold**, *italic*, and plain text inline."""
     tokens = re.split(r'(\*\*.*?\*\*|\*.*?\*)', text)
     for token in tokens:
-        if token.startswith('**') and token.endswith('**'):
+        if token.startswith('**') and token.endswith('**') and len(token) > 4:
             run = paragraph.add_run(token[2:-2])
             run.bold = True
-        elif token.startswith('*') and token.endswith('*'):
+        elif token.startswith('*') and token.endswith('*') and len(token) > 2:
             run = paragraph.add_run(token[1:-1])
             run.italic = True
         else:

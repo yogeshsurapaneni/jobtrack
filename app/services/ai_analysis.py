@@ -1,127 +1,114 @@
 from app.models import Job, ResumeProfile
 from app.services.openrouter import OpenRouterService
 from app.services.resume_generator import ResumeGeneratorService
+import json
+import re
+
 
 class AIAnalysisService:
     @classmethod
     def analyze_job_match(cls, job_id, model=None):
         """
         Analyzes the Resume Profile against the Job Description.
-        Calculates Match Score, identifies Missing Skills, and suggests ATS improvements.
+        Returns a compact JSON dict with: score (int), grade (str),
+        strengths (list[str] max 3), gaps (list[str] max 3), tip (str).
         """
         job = Job.query.get(job_id)
         if not job:
             raise ValueError(f"Job with ID {job_id} not found.")
-            
-        profile = ResumeProfile.query.first()
-        if not profile:
-            raise ValueError("Resume Profile is empty. Please complete your Resume Profile first.")
-            
-        profile_markdown = ResumeGeneratorService.format_profile_to_markdown(profile)
-        
-        system_prompt = (
-            "You are an expert technical recruiter and ATS evaluation system.\n"
-            "Analyze the resume profile against the job description.\n"
-            "Be objective, constructive, and realistic. Do not make up achievements.\n"
-            "Format the output strictly in Markdown using the headers specified."
-        )
-        
-        user_prompt = (
-            f"Here is my Master Resume Profile:\n"
-            f"=================================\n"
-            f"{profile_markdown}\n"
-            f"=================================\n\n"
-            f"Here is the Job Description:\n"
-            f"Company: {job.company}\n"
-            f"Position: {job.position}\n"
-            f"Location: {job.location or 'N/A'}\n"
-            f"Description:\n{job.job_description or 'No description provided.'}\n"
-            f"=================================\n\n"
-            f"Please generate a comprehensive analysis containing:\n"
-            f"1. **Job Match Score**: Give an overall match percentage (e.g. 75%) and break down why.\n"
-            f"2. **Missing Skills**: List specific technical and soft skills mentioned in the job description that are missing or weak in the resume profile.\n"
-            f"3. **ATS Score Details**: Break down the score by: Keywords matched, Formatting, Length (2-page target), Readability, and Overall Score.\n"
-            f"4. **Actionable Suggestions**: Specific changes to keywords or phrasing to improve ATS optimization."
-        )
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ]
-        
-        analysis, model_used = OpenRouterService.generate_completion(messages, model)
-        return analysis
 
-    @classmethod
-    def generate_interview_prep(cls, job_id, model=None):
-        """
-        Generates customized interview prep material based on Job Description and Resume Profile.
-        """
-        job = Job.query.get(job_id)
-        if not job:
-            raise ValueError(f"Job with ID {job_id} not found.")
-            
         profile = ResumeProfile.query.first()
         if not profile:
             raise ValueError("Resume Profile is empty. Please complete your Resume Profile first.")
-            
+
         profile_markdown = ResumeGeneratorService.format_profile_to_markdown(profile)
-        
+
         system_prompt = (
-            "You are an elite interview coach preparing a candidate for a technical/management interview.\n"
-            "Generate realistic questions based on the job description and answer guidelines tailored to the candidate's actual experience.\n"
-            "Output in professional Markdown."
+            "You are an expert ATS evaluator and technical recruiter.\n"
+            "Analyze the resume profile against the job description with precision.\n"
+            "Respond ONLY with a valid JSON object — no markdown, no extra text.\n"
+            "The JSON must follow this exact schema:\n"
+            "{\n"
+            '  "score": <integer 0-100>,\n'
+            '  "grade": <"A"|"B"|"C"|"D">,\n'
+            '  "strengths": [<string>, <string>, <string>],\n'
+            '  "gaps": [<string>, <string>, <string>],\n'
+            '  "tip": <one actionable sentence to improve the score>\n'
+            "}"
         )
-        
+
         user_prompt = (
-            f"Candidate Resume Profile:\n"
-            f"{profile_markdown}\n\n"
-            f"Job Position: {job.position} at {job.company}\n"
-            f"Job Description:\n{job.job_description or 'No description'}\n\n"
-            f"Please generate:\n"
-            f"1. **Top 5 Behavioral Questions**: Tailored questions with suggested STAR answers based on the candidate's profile.\n"
-            f"2. **Top 5 Technical Questions**: Questions relevant to the job requirements with concise conceptual explanations.\n"
-            f"3. **Smart Questions to Ask the Interviewer**: 3 unique, strategic questions about the company's tech stack or domain."
+            f"Resume Profile:\n{profile_markdown}\n\n"
+            f"Job: {job.position} at {job.company}\n"
+            f"Description:\n{job.job_description or 'No description provided.'}\n\n"
+            "Evaluate and return ONLY the JSON object."
         )
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user",   "content": user_prompt}
         ]
-        
-        prep_guide, model_used = OpenRouterService.generate_completion(messages, model)
-        return prep_guide
+
+        raw, model_used = OpenRouterService.generate_completion(messages, model)
+
+        # Strip code fences if model wraps in ```json
+        raw = raw.strip()
+        raw = re.sub(r'^```[a-zA-Z]*\n?', '', raw)
+        raw = re.sub(r'\n?```$', '', raw)
+
+        try:
+            return json.loads(raw.strip())
+        except json.JSONDecodeError:
+            # Fallback: return a minimal dict so the UI never breaks
+            return {
+                "score": 0,
+                "grade": "?",
+                "strengths": ["Could not parse analysis."],
+                "gaps": [],
+                "tip": raw[:300]
+            }
 
     @classmethod
     def generate_email_template(cls, job_id, email_type, model=None):
         """
-        Generates professional email outreach templates (Follow-up, Thank You, Negotiation, etc.).
+        Generates a detailed, professional outreach email with full body.
+        Returns the email as markdown text.
         """
         job = Job.query.get(job_id)
         if not job:
             raise ValueError(f"Job with ID {job_id} not found.")
-            
+
         profile = ResumeProfile.query.first()
-        name = profile.summary.split('\n')[0] if (profile and profile.summary) else "Applicant"
-        
+        profile_markdown = ResumeGeneratorService.format_profile_to_markdown(profile) if profile else ""
+
         system_prompt = (
-            "You are a professional business writer.\n"
-            "Generate a polished, natural-sounding email template.\n"
-            "Keep the tone respectful, clear, and professional. Use brackets like [Your Name] for placeholders."
+            "You are a senior professional business writer specializing in career communications.\n"
+            "Write detailed, complete, ready-to-send emails — not templates with vague placeholders.\n"
+            "Use specific details from the candidate's profile and the job description.\n"
+            "Tone: warm, confident, and professional (US business style).\n"
+            "Structure: Subject Line, then full email body.\n"
+            "Output clean Markdown."
         )
-        
+
         user_prompt = (
-            f"Candidate Name: {name}\n"
-            f"Job Position: {job.position}\n"
-            f"Company: {job.company}\n"
-            f"Email Type: {email_type} (e.g. Recruiter Follow-up, Post-Interview Thank You, Offer Negotiation, Withdrawal)\n\n"
-            f"Please generate a subject line and body for a professional email tailored for this scenario. Keep it concise."
+            f"Candidate Profile:\n{profile_markdown}\n\n"
+            f"Target Role: {job.position} at {job.company}\n"
+            f"Job Description Snippet:\n{(job.job_description or 'N/A')[:600]}\n\n"
+            f"Email Type: {email_type}\n\n"
+            f"Write a complete, detailed, ready-to-send email for this scenario.\n"
+            f"Include:\n"
+            f"- A specific, compelling subject line\n"
+            f"- A full greeting\n"
+            f"- 2-3 substantive body paragraphs that reference specific achievements from the profile and relate them to the role\n"
+            f"- A clear call-to-action\n"
+            f"- A professional sign-off\n"
+            f"Do NOT use generic placeholder text. Make it feel personal and specific."
         )
-        
+
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
+            {"role": "user",   "content": user_prompt}
         ]
-        
-        email_template, model_used = OpenRouterService.generate_completion(messages, model)
-        return email_template
+
+        email_text, model_used = OpenRouterService.generate_completion(messages, model)
+        return email_text
