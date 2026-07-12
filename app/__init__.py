@@ -74,6 +74,40 @@ def _run_migrations():
         END;
         $$;
         """,
+        # 3. Add personal details and upload resume columns to resume_profile table if missing
+        """
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resume_profile' AND column_name='full_name') THEN
+                ALTER TABLE resume_profile ADD COLUMN full_name VARCHAR(150);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resume_profile' AND column_name='email') THEN
+                ALTER TABLE resume_profile ADD COLUMN email VARCHAR(200);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resume_profile' AND column_name='phone') THEN
+                ALTER TABLE resume_profile ADD COLUMN phone VARCHAR(50);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resume_profile' AND column_name='linkedin') THEN
+                ALTER TABLE resume_profile ADD COLUMN linkedin VARCHAR(300);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resume_profile' AND column_name='location') THEN
+                ALTER TABLE resume_profile ADD COLUMN location VARCHAR(200);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resume_profile' AND column_name='website') THEN
+                ALTER TABLE resume_profile ADD COLUMN website VARCHAR(300);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resume_profile' AND column_name='resume_text') THEN
+                ALTER TABLE resume_profile ADD COLUMN resume_text TEXT;
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resume_profile' AND column_name='uploaded_resume_filename') THEN
+                ALTER TABLE resume_profile ADD COLUMN uploaded_resume_filename VARCHAR(255);
+            END IF;
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='resume_profile' AND column_name='uploaded_resume_path') THEN
+                ALTER TABLE resume_profile ADD COLUMN uploaded_resume_path VARCHAR(500);
+            END IF;
+        END;
+        $$;
+        """,
     ]
 
     with db.engine.connect() as conn:
