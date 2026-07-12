@@ -21,6 +21,24 @@ class ResumeGeneratorService:
         Formats a ResumeProfile model object into clean markdown representation for the LLM prompt.
         """
         md = []
+        
+        # Format contact details if available
+        contact = []
+        if profile.full_name:
+            md.append(f"# {profile.full_name}")
+        if profile.email:
+            contact.append(f"Email: {profile.email}")
+        if profile.phone:
+            contact.append(f"Phone: {profile.phone}")
+        if profile.location:
+            contact.append(f"Location: {profile.location}")
+        if profile.linkedin:
+            contact.append(f"LinkedIn: {profile.linkedin}")
+        if profile.website:
+            contact.append(f"Website: {profile.website}")
+        if contact:
+            md.append(" | ".join(contact) + "\n")
+
         if profile.summary:
             md.append(f"# Professional Summary\n{profile.summary}\n")
         

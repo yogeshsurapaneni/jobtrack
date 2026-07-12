@@ -382,10 +382,53 @@ def resume_profile():
         action = request.form.get('action')
 
         if action == 'save_basic':
-            profile.summary = request.form.get('summary')
-            profile.skills  = request.form.get('skills')
+            profile.full_name = request.form.get('full_name', '').strip() or None
+            profile.email     = request.form.get('email', '').strip() or None
+            profile.phone     = request.form.get('phone', '').strip() or None
+            profile.linkedin  = request.form.get('linkedin', '').strip() or None
+            profile.location  = request.form.get('location', '').strip() or None
+            profile.website   = request.form.get('website', '').strip() or None
+            profile.summary   = request.form.get('summary')
+            profile.skills    = request.form.get('skills')
             db.session.commit()
             flash("Basic profile info updated.", "success")
+
+        elif action == 'upload_resume':
+            resume_file = request.files.get('resume_file')
+            if not resume_file or resume_file.filename == '':
+                flash("No resume file uploaded.", "danger")
+            else:
+                from app.services.parser import extract_text_from_file
+                from werkzeug.utils import secure_filename
+                
+                filename = secure_filename(resume_file.filename)
+                file_bytes = resume_file.read()
+                try:
+                    parsed_text = extract_text_from_file(file_bytes, filename)
+                    
+                    minio_path = f"profile/master_resume/{filename}"
+                    storage_service.upload_file(minio_path, file_bytes, content_type=resume_file.content_type)
+                    
+                    profile.resume_text = parsed_text
+                    profile.uploaded_resume_filename = filename
+                    profile.uploaded_resume_path = minio_path
+                    db.session.commit()
+                    flash(f"Resume '{filename}' uploaded and parsed successfully!", "success")
+                except Exception as e:
+                    flash(f"Failed to upload/parse resume: {e}", "danger")
+
+        elif action == 'delete_resume':
+            if profile.uploaded_resume_path:
+                try:
+                    storage_service.client.remove_object(storage_service.bucket_name, profile.uploaded_resume_path)
+                except Exception as e:
+                    print(f"Warning: Failed to delete resume from MinIO: {e}")
+                
+            profile.resume_text = None
+            profile.uploaded_resume_filename = None
+            profile.uploaded_resume_path = None
+            db.session.commit()
+            flash("Uploaded resume deleted.", "info")
 
         elif action == 'add_experience':
             exp = {
@@ -483,6 +526,36 @@ def resume_profile():
     from flask import current_app
     backups = BackupService.list_backups_in_minio()
     return render_template('resume.html', profile=profile, backups=backups, config=current_app.config)
+
+
+@main.route('/resume/download')
+def download_resume():
+    profile = ResumeProfile.query.first()
+    if not profile or not profile.uploaded_resume_path:
+        flash("No uploaded resume found.", "danger")
+        return redirect(url_for('main.resume_profile'))
+    
+    try:
+        file_bytes = storage_service.download_file(profile.uploaded_resume_path)
+        import io
+        from flask import send_file
+        mimetype = 'application/octet-stream'
+        if profile.uploaded_resume_filename.lower().endswith('.pdf'):
+            mimetype = 'application/pdf'
+        elif profile.uploaded_resume_filename.lower().endswith('.docx'):
+            mimetype = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        elif profile.uploaded_resume_filename.lower().endswith('.txt'):
+            mimetype = 'text/plain'
+            
+        return send_file(
+            io.BytesIO(file_bytes),
+            mimetype=mimetype,
+            as_attachment=True,
+            download_name=profile.uploaded_resume_filename
+        )
+    except Exception as e:
+        flash(f"Could not download file from storage: {e}", "danger")
+        return redirect(url_for('main.resume_profile'))
 
 
 # ---------------------------------------------------------------------------
@@ -615,18 +688,33 @@ INTERVIEW_STATUSES = {
 @main.route('/jobs/<int:job_id>/interview-event/add', methods=['POST'])
 def add_interview_event(job_id):
     job = Job.query.get_or_404(job_id)
-    round_name      = request.form.get('round_name', '')
-    scheduled_str   = request.form.get('scheduled_at', '')
-    duration_min    = request.form.get('duration_min')
-    meeting_link    = request.form.get('meeting_link', '')
-    career_site_url = request.form.get('career_site_url', '')
-    interviewer     = request.form.get('interviewer', '')
-    event_notes     = request.form.get('event_notes', '')
+    round_name      = request.form.get('round_name', '').strip()
+    scheduled_str   = request.form.get('scheduled_at', '').strip()
+    duration_min    = request.form.get('duration_min', '').strip()
+    meeting_link    = request.form.get('meeting_link', '').strip() or None
+    career_site_url = request.form.get('career_site_url', '').strip() or None
+    interviewer     = request.form.get('interviewer', '').strip() or None
+    event_notes     = request.form.get('event_notes', '').strip() or None
+
+    if not round_name:
+        flash('Round type is required.', 'danger')
+        return redirect(url_for('main.job_detail', job_id=job_id))
 
     scheduled_at = None
     if scheduled_str:
         try:
-            scheduled_at = datetime.strptime(scheduled_str, '%Y-%m-%dT%H:%M')
+            scheduled_at = datetime.fromisoformat(scheduled_str)
+        except ValueError:
+            try:
+                scheduled_at = datetime.strptime(scheduled_str, '%Y-%m-%dT%H:%M')
+            except ValueError:
+                flash('Invalid date/time format.', 'danger')
+                return redirect(url_for('main.job_detail', job_id=job_id))
+
+    dur = None
+    if duration_min:
+        try:
+            dur = int(duration_min)
         except ValueError:
             pass
 
@@ -634,11 +722,11 @@ def add_interview_event(job_id):
         job_id          = job.id,
         round_name      = round_name,
         scheduled_at    = scheduled_at,
-        duration_min    = int(duration_min) if duration_min else None,
-        meeting_link    = meeting_link or None,
-        career_site_url = career_site_url or None,
-        interviewer     = interviewer or None,
-        notes           = event_notes or None,
+        duration_min    = dur,
+        meeting_link    = meeting_link,
+        career_site_url = career_site_url,
+        interviewer     = interviewer,
+        notes           = event_notes,
     )
     db.session.add(ev)
 
@@ -661,7 +749,7 @@ def add_interview_event(job_id):
 
 @main.route('/jobs/<int:job_id>/interview-event/<int:ev_id>/delete', methods=['POST'])
 def delete_interview_event(job_id, ev_id):
-    ev = InterviewEvent.query.get_or_404(ev_id)
+    ev = InterviewEvent.query.filter_by(id=ev_id, job_id=job_id).first_or_404()
     db.session.delete(ev)
     db.session.commit()
     flash('Interview event deleted.', 'info')
@@ -714,61 +802,3 @@ def backup_github_restore():
     return redirect(url_for('main.dashboard'))
 
 
-# ---------------------------------------------------------------------------
-# Interview Events (per-job round tracking)
-# ---------------------------------------------------------------------------
-
-@main.route('/jobs/<int:job_id>/interview-events/add', methods=['POST'])
-def add_interview_event(job_id):
-    job = Job.query.get_or_404(job_id)
-
-    round_name      = request.form.get('round_name', '').strip()
-    scheduled_str   = request.form.get('scheduled_at', '').strip()
-    duration_min    = request.form.get('duration_min', '').strip()
-    meeting_link    = request.form.get('meeting_link', '').strip() or None
-    career_site_url = request.form.get('career_site_url', '').strip() or None
-    interviewer     = request.form.get('interviewer', '').strip() or None
-    event_notes     = request.form.get('event_notes', '').strip() or None
-
-    if not round_name:
-        flash('Round type is required.', 'danger')
-        return redirect(url_for('main.job_detail', job_id=job_id))
-
-    scheduled_at = None
-    if scheduled_str:
-        try:
-            scheduled_at = datetime.fromisoformat(scheduled_str)
-        except ValueError:
-            flash('Invalid date/time format.', 'danger')
-            return redirect(url_for('main.job_detail', job_id=job_id))
-
-    dur = None
-    if duration_min:
-        try:
-            dur = int(duration_min)
-        except ValueError:
-            pass
-
-    ev = InterviewEvent(
-        job_id          = job.id,
-        round_name      = round_name,
-        scheduled_at    = scheduled_at,
-        duration_min    = dur,
-        meeting_link    = meeting_link,
-        career_site_url = career_site_url,
-        interviewer     = interviewer,
-        notes           = event_notes,
-    )
-    db.session.add(ev)
-    db.session.commit()
-    flash(f'Interview event "{round_name}" scheduled!', 'success')
-    return redirect(url_for('main.job_detail', job_id=job_id))
-
-
-@main.route('/jobs/<int:job_id>/interview-events/<int:ev_id>/delete', methods=['POST'])
-def delete_interview_event(job_id, ev_id):
-    ev = InterviewEvent.query.filter_by(id=ev_id, job_id=job_id).first_or_404()
-    db.session.delete(ev)
-    db.session.commit()
-    flash('Interview event deleted.', 'info')
-    return redirect(url_for('main.job_detail', job_id=job_id))

@@ -23,12 +23,21 @@ class BackupService:
         profile_data = {}
         if profile:
             profile_data = {
-                "summary":              profile.summary,
-                "skills":               profile.skills,
-                "experience_json":      profile.experience_json,
-                "education_json":       profile.education_json,
-                "projects_json":        profile.projects_json,
-                "certifications_json":  profile.certifications_json,
+                "full_name":                profile.full_name,
+                "email":                    profile.email,
+                "phone":                    profile.phone,
+                "linkedin":                 profile.linkedin,
+                "location":                 profile.location,
+                "website":                  profile.website,
+                "summary":                  profile.summary,
+                "skills":                   profile.skills,
+                "experience_json":          profile.experience_json,
+                "education_json":           profile.education_json,
+                "projects_json":            profile.projects_json,
+                "certifications_json":      profile.certifications_json,
+                "resume_text":              profile.resume_text,
+                "uploaded_resume_filename": profile.uploaded_resume_filename,
+                "uploaded_resume_path":     profile.uploaded_resume_path,
             }
 
         jobs_list = []
@@ -241,12 +250,21 @@ class BackupService:
         pd = backup_data.get("resume_profile", {})
         if pd:
             db.session.add(ResumeProfile(
-                summary             = pd.get("summary"),
-                skills              = pd.get("skills"),
-                experience_json     = pd.get("experience_json"),
-                education_json      = pd.get("education_json"),
-                projects_json       = pd.get("projects_json"),
-                certifications_json = pd.get("certifications_json"),
+                full_name                = pd.get("full_name"),
+                email                    = pd.get("email"),
+                phone                    = pd.get("phone"),
+                linkedin                 = pd.get("linkedin"),
+                location                 = pd.get("location"),
+                website                  = pd.get("website"),
+                summary                  = pd.get("summary"),
+                skills                   = pd.get("skills"),
+                experience_json          = pd.get("experience_json"),
+                education_json           = pd.get("education_json"),
+                projects_json            = pd.get("projects_json"),
+                certifications_json      = pd.get("certifications_json"),
+                resume_text              = pd.get("resume_text"),
+                uploaded_resume_filename = pd.get("uploaded_resume_filename"),
+                uploaded_resume_path     = pd.get("uploaded_resume_path"),
             ))
 
         # Restore Jobs

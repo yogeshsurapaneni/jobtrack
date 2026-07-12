@@ -11,19 +11,84 @@
 <div class="row g-4">
     <!-- Left Column: Summary & Skills -->
     <div class="col-lg-5">
+        <!-- Master Resume PDF/Word Upload Card -->
+        <div class="card border-0 shadow-sm p-4 mb-4">
+            <h5 class="fw-bold mb-3"><i class="fa-solid fa-file-pdf text-primary me-2"></i>Upload Master Resume</h5>
+            <p class="text-muted small">Upload your existing latest resume (PDF, DOCX, or TXT) to parse it and make it available for the AI. This acts as the source of truth for generating tailored documents.</p>
+            
+            {% if profile.uploaded_resume_filename %}
+                <div class="p-3 mb-3 border rounded bg-light d-flex justify-content-between align-items-center">
+                    <div class="overflow-hidden me-2">
+                        <span class="fw-bold text-dark small d-block mb-1 text-truncate" title="{{ profile.uploaded_resume_filename }}"><i class="fa-regular fa-file-lines text-primary me-1"></i>{{ profile.uploaded_resume_filename }}</span>
+                        <a href="{{ url_for('main.download_resume') }}" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.8em;">
+                            <i class="fa-solid fa-download me-1"></i>Download
+                        </a>
+                    </div>
+                    <form action="{{ url_for('main.resume_profile') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete your uploaded master resume?');">
+                        <input type="hidden" name="action" value="delete_resume">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Resume">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+
+            <form action="{{ url_for('main.resume_profile') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="upload_resume">
+                <div class="mb-3">
+                    <input type="file" name="resume_file" class="form-control form-control-sm" accept=".pdf,.docx,.txt" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fa-solid fa-upload me-2"></i>Upload & Parse Resume</button>
+            </form>
+        </div>
+
+        <!-- Core Details Card -->
         <div class="card border-0 shadow-sm p-4 mb-4">
             <h5 class="fw-bold mb-3"><i class="fa-solid fa-id-card text-primary me-2"></i>Core Details</h5>
             <form action="{{ url_for('main.resume_profile') }}" method="POST">
                 <input type="hidden" name="action" value="save_basic">
                 
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-medium">Full Name</label>
+                        <input type="text" name="full_name" class="form-control form-control-sm" placeholder="Jane Doe" value="{{ profile.full_name or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-medium">Email Address</label>
+                        <input type="email" name="email" class="form-control form-control-sm" placeholder="jane.doe@example.com" value="{{ profile.email or '' }}">
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-medium">Phone Number</label>
+                        <input type="text" name="phone" class="form-control form-control-sm" placeholder="+1 (555) 019-9000" value="{{ profile.phone or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-medium">Location</label>
+                        <input type="text" name="location" class="form-control form-control-sm" placeholder="San Francisco, CA" value="{{ profile.location or '' }}">
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-medium">LinkedIn URL</label>
+                        <input type="text" name="linkedin" class="form-control form-control-sm" placeholder="linkedin.com/in/janedoe" value="{{ profile.linkedin or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-medium">Portfolio / Website</label>
+                        <input type="text" name="website" class="form-control form-control-sm" placeholder="janedoe.dev" value="{{ profile.website or '' }}">
+                    </div>
+                </div>
+
                 <div class="mb-3">
                     <label class="form-label small fw-medium">Professional Summary</label>
-                    <textarea name="summary" class="form-control" rows="6" required placeholder="Write a brief professional summary of your background and value proposition...">{{ profile.summary or '' }}</textarea>
+                    <textarea name="summary" class="form-control form-control-sm" rows="5" required placeholder="Write a brief professional summary...">{{ profile.summary or '' }}</textarea>
                 </div>
                 
                 <div class="mb-4">
                     <label class="form-label small fw-medium">Technical Skills (by Category)</label>
-                    <textarea name="skills" class="form-control font-monospace" rows="5" required placeholder="Languages: Python, Go, JavaScript&#10;Frameworks: FastAPI, Flask, Django&#10;Cloud: AWS, GCP, Azure, Terraform">{{ profile.skills or '' }}</textarea>
+                    <textarea name="skills" class="form-control form-control-sm font-monospace" rows="4" required placeholder="Languages: Python, Go&#10;Frameworks: Flask, FastAPI">{{ profile.skills or '' }}</textarea>
                 </div>
                 
                 <button type="submit" class="btn btn-primary w-100"><i class="fa-solid fa-floppy-disk me-2"></i>Save Core Details</button>

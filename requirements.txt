@@ -11,3 +11,4 @@ markdown==3.6
 gunicorn==22.0.0
 python-dotenv==1.0.1
 APScheduler==3.10.4
+pypdf==4.2.0

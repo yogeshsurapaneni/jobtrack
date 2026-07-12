@@ -411,3 +411,41 @@ def _parse_inline(paragraph, text):
             run.italic = True
         else:
             paragraph.add_run(token)
+
+
+def extract_text_from_file(file_bytes: bytes, filename: str) -> str:
+    """
+    Extract text from PDF, DOCX, or TXT file bytes.
+    """
+    ext = filename.rsplit('.', 1)[-1].lower()
+    if ext == 'txt':
+        return file_bytes.decode('utf-8', errors='ignore')
+    elif ext == 'docx':
+        import io
+        import docx
+        doc = docx.Document(io.BytesIO(file_bytes))
+        paragraphs = []
+        for p in doc.paragraphs:
+            if p.text.strip():
+                paragraphs.append(p.text.strip())
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                if row_text:
+                    paragraphs.append(" | ".join(row_text))
+        return "\n".join(paragraphs)
+    elif ext == 'pdf':
+        try:
+            import io
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(file_bytes))
+            text_parts = []
+            for page in reader.pages:
+                t = page.extract_text()
+                if t:
+                    text_parts.append(t)
+            return "\n".join(text_parts)
+        except ImportError:
+            raise RuntimeError("PDF parsing requires 'pypdf' package to be installed.")
+    else:
+        raise ValueError(f"Unsupported file extension: .{ext}")

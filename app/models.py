@@ -91,10 +91,25 @@ class ResumeProfile(db.Model):
     __tablename__ = 'resume_profile'
     
     id = db.Column(db.Integer, primary_key=True)
+
+    # Personal details
+    full_name = db.Column(db.String(150), nullable=True)
+    email = db.Column(db.String(200), nullable=True)
+    phone = db.Column(db.String(50), nullable=True)
+    linkedin = db.Column(db.String(300), nullable=True)
+    location = db.Column(db.String(200), nullable=True)
+    website = db.Column(db.String(300), nullable=True)
+
     summary = db.Column(db.Text, nullable=True)
     skills = db.Column(db.Text, nullable=True)
     experience_json = db.Column(db.JSON, nullable=True) # List of dicts: company, position, start_date, end_date, description
     education_json = db.Column(db.JSON, nullable=True)  # List of dicts: school, degree, field_of_study, graduation_date, gpa
     projects_json = db.Column(db.JSON, nullable=True)   # List of dicts: title, description, technologies, link
     certifications_json = db.Column(db.JSON, nullable=True) # List of dicts: name, authority, date_obtained, link
+
+    # Uploaded resume (source of truth for AI)
+    resume_text = db.Column(db.Text, nullable=True)                # Parsed text from uploaded resume
+    uploaded_resume_filename = db.Column(db.String(255), nullable=True)
+    uploaded_resume_path = db.Column(db.String(500), nullable=True)  # MinIO path
+
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

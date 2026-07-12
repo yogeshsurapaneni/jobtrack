@@ -147,6 +147,12 @@ def seed_data():
 
     if not ResumeProfile.query.first():
         profile = ResumeProfile(
+            full_name="Demo User",
+            email="demo@example.com",
+            phone="+1 (555) 019-9000",
+            linkedin="linkedin.com/in/demouser",
+            location="San Francisco, CA",
+            website="demouser.dev",
             summary="Senior Software Engineer with 6+ years of experience building scalable backend APIs, microservices, and distributed cloud applications. Proficient in Python, Go, and AWS cloud infrastructures.",
             skills="Languages: Python, Go, SQL, Javascript\nFrameworks: FastAPI, Flask, Django, Gin\nDevOps & Infrastructure: Docker, Kubernetes, AWS (S3, EC2, RDS, Lambda), PostgreSQL, Redis, CI/CD",
             experience_json=[
