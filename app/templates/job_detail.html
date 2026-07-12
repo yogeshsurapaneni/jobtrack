@@ -87,16 +87,9 @@
 
     <!-- Documents Card -->
     <div class="card border-0 shadow-sm p-4">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0">
-          <i class="fa-solid fa-folder-open text-primary me-2"></i>Generated Documents
-        </h5>
-        {% if not resume_versions %}
-          <span class="badge bg-warning text-dark small">
-            <i class="fa-solid fa-spinner fa-spin me-1"></i>Generating…
-          </span>
-        {% endif %}
-      </div>
+      <h5 class="fw-bold mb-4">
+        <i class="fa-solid fa-folder-open text-primary me-2"></i>Generated Documents
+      </h5>
 
       <div class="row g-4">
         <!-- Tailored Resumes -->
@@ -136,9 +129,8 @@
             {% endfor %}
           {% else %}
             <div class="text-muted small text-center py-4 border rounded-3 bg-light">
-              <i class="fa-solid fa-hourglass-half fa-lg mb-2 d-block text-warning"></i>
-              AI is generating your tailored resume…<br>
-              <span class="text-muted" style="font-size:0.8em;">Refresh the page in ~30 seconds.</span>
+              <i class="fa-solid fa-file-circle-plus fa-lg mb-2 d-block text-secondary opacity-50"></i>
+              No tailored resume yet.
             </div>
           {% endif %}
         </div>
@@ -180,34 +172,53 @@
             {% endfor %}
           {% else %}
             <div class="text-muted small text-center py-4 border rounded-3 bg-light">
-              <i class="fa-solid fa-hourglass-half fa-lg mb-2 d-block text-warning"></i>
-              AI is writing your cover letter…<br>
-              <span class="text-muted" style="font-size:0.8em;">Refresh the page in ~30 seconds.</span>
+              <i class="fa-solid fa-envelope-circle-check fa-lg mb-2 d-block text-secondary opacity-50"></i>
+              No cover letter yet.
             </div>
           {% endif %}
         </div>
       </div>
 
-      <!-- Manual Re-generate strip -->
-      <div class="border-top mt-3 pt-3">
-        <form id="ai-generator-form" action="" method="POST">
-          <input type="hidden" id="regen-model" name="model" value="google/gemini-2.5-flash">
-          <div class="mb-3">
-            <label class="form-label small fw-medium text-secondary">Custom Prompt Instructions (Optional)</label>
-            <textarea name="additional_notes" id="regen-notes" class="form-control form-control-sm" rows="2" 
-                      placeholder="e.g. 'Focus heavily on GCP and architecture', 'Emphasize Python over Go', 'Limit to one page'"></textarea>
-          </div>
-          <div class="d-flex gap-2">
-            <button type="submit" onclick="submitAIForm('resume')"
-                    class="btn btn-sm btn-outline-dark text-nowrap flex-fill">
-              <i class="fa-solid fa-rotate me-1"></i>Re-generate CV
+      <!-- AI Generation Controls -->
+      <div class="border-top mt-4 pt-4">
+        <h6 class="fw-bold text-secondary mb-3">
+          <i class="fa-solid fa-wand-magic-sparkles me-2 text-primary"></i>AI Document Generation
+        </h6>
+        <div class="mb-3">
+          <label class="form-label small fw-medium text-secondary">Model</label>
+          <select id="gen-model" class="form-select form-select-sm">
+            {% for val, label in models %}
+              <option value="{{ val }}" {% if val == 'google/gemini-2.5-flash' %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-medium text-secondary">
+            Custom Instructions <span class="fw-normal text-muted">(optional)</span>
+          </label>
+          <textarea id="gen-notes" class="form-control form-control-sm" rows="2"
+                    placeholder="e.g. 'Focus heavily on AWS', 'Limit to one page', 'Emphasise Python'"></textarea>
+        </div>
+        <div class="d-flex gap-2">
+          <form id="form-resume" action="{{ url_for('main.generate_resume', job_id=job.id) }}" method="POST" class="flex-fill">
+            <input type="hidden" name="model" id="form-resume-model">
+            <input type="hidden" name="additional_notes" id="form-resume-notes">
+            <button type="submit" class="btn btn-sm btn-outline-dark w-100 text-nowrap"
+                    onclick="syncGenFields('form-resume')">
+              <i class="fa-solid fa-file-circle-plus me-1"></i>
+              {{ 'Re-generate' if resume_versions else 'Generate' }} CV
             </button>
-            <button type="submit" onclick="submitAIForm('coverletter')"
-                    class="btn btn-sm btn-outline-dark text-nowrap flex-fill">
-              <i class="fa-solid fa-rotate me-1"></i>Re-generate Letter
+          </form>
+          <form id="form-cl" action="{{ url_for('main.generate_cover_letter', job_id=job.id) }}" method="POST" class="flex-fill">
+            <input type="hidden" name="model" id="form-cl-model">
+            <input type="hidden" name="additional_notes" id="form-cl-notes">
+            <button type="submit" class="btn btn-sm btn-outline-dark w-100 text-nowrap"
+                    onclick="syncGenFields('form-cl')">
+              <i class="fa-solid fa-envelope-open-text me-1"></i>
+              {{ 'Re-generate' if cl_versions else 'Generate' }} Letter
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
 
     </div>
@@ -577,15 +588,18 @@
 
 {% block scripts %}
 <script>
-// ── Form submit helpers ──────────────────────────────────────────────────
-function submitAIForm(type) {
-  // Sync model from the right-column selector
-  var model = document.getElementById('selected-model')?.value || 'google/gemini-2.5-flash';
-  document.getElementById('regen-model').value = model;
-  var form = document.getElementById('ai-generator-form');
-  form.action = type === 'resume'
-    ? "{{ url_for('main.generate_resume', job_id=job.id) }}"
-    : "{{ url_for('main.generate_cover_letter', job_id=job.id) }}";
+// ── AI form sync helper ───────────────────────────────────────────────────
+function syncGenFields(formId) {
+  var model = document.getElementById('gen-model')?.value || 'google/gemini-2.5-flash';
+  var notes = document.getElementById('gen-notes')?.value || '';
+  if (formId === 'form-resume') {
+    document.getElementById('form-resume-model').value = model;
+    document.getElementById('form-resume-notes').value = notes;
+  } else if (formId === 'form-cl') {
+    document.getElementById('form-cl-model').value = model;
+    document.getElementById('form-cl-notes').value = notes;
+  }
+  // return true so the form submits normally
 }
 
 // ── Match Score ──────────────────────────────────────────────────────────

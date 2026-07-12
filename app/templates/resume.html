@@ -1,32 +1,36 @@
 {% extends 'base.html' %}
 
-{% block title %}Master Resume Profile - JobTracker{% endblock %}
+{% block title %}Master Resume Profile - CareerOS{% endblock %}
 
 {% block content %}
 <div class="mb-4">
     <h2 class="fw-bold text-dark">Master Resume Profile</h2>
-    <p class="text-muted">This structured data acts as your canonical profile. The AI uses this data to honestly tailor your resumes and cover letters. <strong>Do not edit PDFs manually anymore!</strong></p>
+    <p class="text-muted">Upload your latest resume file and fill in your contact details. The AI uses this as the source of truth for generating tailored applications.</p>
 </div>
 
 <div class="row g-4">
-    <!-- Left Column: Summary & Skills -->
+    <!-- Left Column -->
     <div class="col-lg-5">
-        <!-- Master Resume PDF/Word Upload Card -->
+
+        <!-- Upload Master Resume Card -->
         <div class="card border-0 shadow-sm p-4 mb-4">
-            <h5 class="fw-bold mb-3"><i class="fa-solid fa-file-pdf text-primary me-2"></i>Upload Master Resume</h5>
-            <p class="text-muted small">Upload your existing latest resume (PDF, DOCX, or TXT) to parse it and make it available for the AI. This acts as the source of truth for generating tailored documents.</p>
-            
+            <h5 class="fw-bold mb-2"><i class="fa-solid fa-file-pdf text-primary me-2"></i>Master Resume File</h5>
+            <p class="text-muted small mb-3">Upload your latest resume (PDF, DOCX, or TXT). The AI parses this as the source of truth for tailoring applications.</p>
+
             {% if profile.uploaded_resume_filename %}
                 <div class="p-3 mb-3 border rounded bg-light d-flex justify-content-between align-items-center">
                     <div class="overflow-hidden me-2">
-                        <span class="fw-bold text-dark small d-block mb-1 text-truncate" title="{{ profile.uploaded_resume_filename }}"><i class="fa-regular fa-file-lines text-primary me-1"></i>{{ profile.uploaded_resume_filename }}</span>
-                        <a href="{{ url_for('main.download_resume') }}" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size: 0.8em;">
+                        <span class="fw-bold text-dark small d-block mb-1 text-truncate" title="{{ profile.uploaded_resume_filename }}">
+                            <i class="fa-regular fa-file-lines text-primary me-1"></i>{{ profile.uploaded_resume_filename }}
+                        </span>
+                        <a href="{{ url_for('main.download_resume') }}" class="btn btn-sm btn-outline-secondary py-0 px-2" style="font-size:0.8em;">
                             <i class="fa-solid fa-download me-1"></i>Download
                         </a>
                     </div>
-                    <form action="{{ url_for('main.resume_profile') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete your uploaded master resume?');">
+                    <form action="{{ url_for('main.resume_profile') }}" method="POST"
+                          onsubmit="return confirm('Delete your uploaded master resume?');">
                         <input type="hidden" name="action" value="delete_resume">
-                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Resume">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
                             <i class="fa-regular fa-trash-can"></i>
                         </button>
                     </form>
@@ -36,9 +40,12 @@
             <form action="{{ url_for('main.resume_profile') }}" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="action" value="upload_resume">
                 <div class="mb-3">
-                    <input type="file" name="resume_file" class="form-control form-control-sm" accept=".pdf,.docx,.txt" required>
+                    <input type="file" name="resume_file" class="form-control form-control-sm"
+                           accept=".pdf,.docx,.txt" required>
                 </div>
-                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fa-solid fa-upload me-2"></i>Upload & Parse Resume</button>
+                <button type="submit" class="btn btn-primary btn-sm w-100">
+                    <i class="fa-solid fa-upload me-2"></i>Upload &amp; Parse Resume
+                </button>
             </form>
         </div>
 
@@ -47,448 +54,219 @@
             <h5 class="fw-bold mb-3"><i class="fa-solid fa-id-card text-primary me-2"></i>Core Details</h5>
             <form action="{{ url_for('main.resume_profile') }}" method="POST">
                 <input type="hidden" name="action" value="save_basic">
-                
+
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
                         <label class="form-label small fw-medium">Full Name</label>
-                        <input type="text" name="full_name" class="form-control form-control-sm" placeholder="Jane Doe" value="{{ profile.full_name or '' }}">
+                        <input type="text" name="full_name" class="form-control form-control-sm"
+                               placeholder="Jane Doe" value="{{ profile.full_name or '' }}">
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label small fw-medium">Email Address</label>
-                        <input type="email" name="email" class="form-control form-control-sm" placeholder="jane.doe@example.com" value="{{ profile.email or '' }}">
+                        <label class="form-label small fw-medium">Email</label>
+                        <input type="email" name="email" class="form-control form-control-sm"
+                               placeholder="jane.doe@example.com" value="{{ profile.email or '' }}">
                     </div>
                 </div>
 
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
-                        <label class="form-label small fw-medium">Phone Number</label>
-                        <input type="text" name="phone" class="form-control form-control-sm" placeholder="+1 (555) 019-9000" value="{{ profile.phone or '' }}">
+                        <label class="form-label small fw-medium">Phone</label>
+                        <input type="text" name="phone" class="form-control form-control-sm"
+                               placeholder="+1 (555) 000-0000" value="{{ profile.phone or '' }}">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-medium">Location</label>
-                        <input type="text" name="location" class="form-control form-control-sm" placeholder="San Francisco, CA" value="{{ profile.location or '' }}">
+                        <input type="text" name="location" class="form-control form-control-sm"
+                               placeholder="San Francisco, CA" value="{{ profile.location or '' }}">
                     </div>
                 </div>
 
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
-                        <label class="form-label small fw-medium">LinkedIn URL</label>
-                        <input type="text" name="linkedin" class="form-control form-control-sm" placeholder="linkedin.com/in/janedoe" value="{{ profile.linkedin or '' }}">
+                        <label class="form-label small fw-medium">LinkedIn</label>
+                        <input type="text" name="linkedin" class="form-control form-control-sm"
+                               placeholder="linkedin.com/in/janedoe" value="{{ profile.linkedin or '' }}">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-medium">Portfolio / Website</label>
-                        <input type="text" name="website" class="form-control form-control-sm" placeholder="janedoe.dev" value="{{ profile.website or '' }}">
+                        <input type="text" name="website" class="form-control form-control-sm"
+                               placeholder="janedoe.dev" value="{{ profile.website or '' }}">
                     </div>
                 </div>
 
                 <div class="mb-3">
                     <label class="form-label small fw-medium">Professional Summary</label>
-                    <textarea name="summary" class="form-control form-control-sm" rows="5" required placeholder="Write a brief professional summary...">{{ profile.summary or '' }}</textarea>
+                    <textarea name="summary" class="form-control form-control-sm" rows="4"
+                              placeholder="Brief professional summary…">{{ profile.summary or '' }}</textarea>
                 </div>
-                
+
                 <div class="mb-4">
                     <label class="form-label small fw-medium">Technical Skills (by Category)</label>
-                    <textarea name="skills" class="form-control form-control-sm font-monospace" rows="4" required placeholder="Languages: Python, Go&#10;Frameworks: Flask, FastAPI">{{ profile.skills or '' }}</textarea>
+                    <textarea name="skills" class="form-control form-control-sm font-monospace" rows="4"
+                              placeholder="Languages: Python, Go&#10;Frameworks: Flask, FastAPI&#10;Cloud: AWS, GCP">{{ profile.skills or '' }}</textarea>
                 </div>
-                
-                <button type="submit" class="btn btn-primary w-100"><i class="fa-solid fa-floppy-disk me-2"></i>Save Core Details</button>
+
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fa-solid fa-floppy-disk me-2"></i>Save Core Details
+                </button>
             </form>
         </div>
 
-        <!-- Data Backup & Restore Card -->
+    </div>
+
+    <!-- Right Column: Backup & Recovery -->
+    <div class="col-lg-7">
         <div class="card border-0 shadow-sm p-4">
-            <h5 class="fw-bold mb-3"><i class="fa-solid fa-database text-primary me-2"></i>Backup & Recovery</h5>
-            
-            <!-- Local Actions -->
-            <div class="mb-4">
-                <h6 class="fw-bold text-secondary small mb-2">Local Operations</h6>
+            <h5 class="fw-bold mb-4"><i class="fa-solid fa-database text-primary me-2"></i>Backup &amp; Recovery</h5>
+
+            <!-- Local Operations -->
+            <div class="mb-5">
+                <h6 class="fw-semibold text-secondary small text-uppercase letter-spacing mb-3">Local Operations</h6>
                 <div class="d-grid gap-2">
                     <a href="{{ url_for('main.download_local_backup') }}" class="btn btn-outline-primary btn-sm text-start">
-                        <i class="fa-solid fa-file-arrow-down me-2"></i>Download JSON Backup
+                        <i class="fa-solid fa-file-arrow-down me-2"></i>Download Full JSON Backup
                     </a>
-                    
-                    <form action="{{ url_for('main.upload_backup') }}" method="POST" enctype="multipart/form-data" class="mt-2 border p-2 rounded bg-light">
-                        <label class="form-label small fw-semibold text-muted mb-1">Restore from Uploaded JSON</label>
-                        <div class="input-group input-group-sm">
-                            <input type="file" name="backup_file" class="form-control" accept=".json" required>
-                            <button type="submit" class="btn btn-primary" onclick="return confirm('WARNING: Uploading a backup will completely overwrite your current database. Proceed?');">Restore</button>
+                    <div class="border rounded p-3 bg-light">
+                        <label class="form-label small fw-semibold text-muted mb-2">Restore from JSON File</label>
+                        <form action="{{ url_for('main.upload_backup') }}" method="POST" enctype="multipart/form-data">
+                            <div class="input-group input-group-sm">
+                                <input type="file" name="backup_file" class="form-control" accept=".json" required>
+                                <button type="submit" class="btn btn-danger"
+                                        onclick="return confirm('WARNING: This will completely overwrite your current database. Proceed?');">
+                                    Restore
+                                </button>
+                            </div>
+                        </form>
+                        <div class="text-muted mt-2" style="font-size:0.75em;">
+                            <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i>
+                            Restoring a backup will overwrite all current data.
                         </div>
-                    </form>
+                    </div>
                 </div>
             </div>
-            
-            <!-- MinIO Cloud Storage -->
-            <div class="mb-4">
-                <h6 class="fw-bold text-secondary small mb-2">MinIO Cloud Storage</h6>
+
+            <!-- MinIO Cloud -->
+            <div class="mb-5">
+                <h6 class="fw-semibold text-secondary small text-uppercase mb-3">MinIO Cloud Storage</h6>
                 <form action="{{ url_for('main.create_backup') }}" method="POST" class="mb-3">
-                    <button type="submit" class="btn btn-primary btn-sm w-100"><i class="fa-solid fa-cloud-arrow-up me-2"></i>Backup Database to MinIO</button>
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fa-solid fa-cloud-arrow-up me-2"></i>Backup Database to MinIO
+                    </button>
                 </form>
-                
-                <label class="form-label small fw-semibold text-muted">Available Backups in MinIO</label>
+
+                <label class="form-label small fw-semibold text-muted">Stored Backups</label>
                 {% if backups %}
-                    <div class="list-group list-group-flush border rounded bg-light mt-1" style="max-height: 200px; overflow-y: auto;">
+                    <div class="list-group list-group-flush border rounded bg-light mt-1" style="max-height:250px;overflow-y:auto;">
                         {% for backup in backups %}
                         <div class="list-group-item p-2 d-flex justify-content-between align-items-center bg-transparent border-bottom">
                             <div>
-                                <div class="small fw-semibold text-dark text-break" style="font-size: 0.85em;">{{ backup.filename }}</div>
-                                <span class="text-muted" style="font-size: 0.7em;">{{ backup.size }} | {{ backup.last_modified }}</span>
+                                <div class="small fw-semibold text-dark text-break" style="font-size:0.85em;">{{ backup.filename }}</div>
+                                <span class="text-muted" style="font-size:0.7em;">{{ backup.size }} &middot; {{ backup.last_modified }}</span>
                             </div>
                             <div class="d-flex gap-1">
-                                <!-- Restore form -->
-                                <form action="{{ url_for('main.restore_backup_minio') }}" method="POST" onsubmit="return confirm('WARNING: Restoring this backup will overwrite current database state. Proceed?');">
+                                <form action="{{ url_for('main.restore_backup_minio') }}" method="POST"
+                                      onsubmit="return confirm('Restoring this backup will overwrite your current data. Proceed?');">
                                     <input type="hidden" name="path" value="{{ backup.path }}">
-                                    <button type="submit" class="btn btn-sm btn-light text-success p-1" title="Restore"><i class="fa-solid fa-rotate-left"></i></button>
+                                    <button type="submit" class="btn btn-sm btn-light text-success p-1" title="Restore">
+                                        <i class="fa-solid fa-rotate-left"></i>
+                                    </button>
                                 </form>
-                                <!-- Delete form -->
-                                <form action="{{ url_for('main.delete_backup_minio') }}" method="POST" onsubmit="return confirm('Delete this backup file from MinIO?');">
+                                <form action="{{ url_for('main.delete_backup_minio') }}" method="POST"
+                                      onsubmit="return confirm('Delete this backup file?');">
                                     <input type="hidden" name="path" value="{{ backup.path }}">
-                                    <button type="submit" class="btn btn-sm btn-light text-danger p-1" title="Delete"><i class="fa-regular fa-trash-can"></i></button>
+                                    <button type="submit" class="btn btn-sm btn-light text-danger p-1" title="Delete">
+                                        <i class="fa-regular fa-trash-can"></i>
+                                    </button>
                                 </form>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
                 {% else %}
-                    <p class="text-muted small text-center my-3"><i class="fa-solid fa-folder-open opacity-50 mb-1"></i><br>No cloud backups found.</p>
+                    <p class="text-muted small text-center my-3">
+                        <i class="fa-solid fa-folder-open opacity-50 d-block mb-1"></i>No cloud backups found.
+                    </p>
                 {% endif %}
             </div>
 
-            <!-- GitHub Backup Storage -->
+            <!-- GitHub Backup -->
             <div>
-                <h6 class="fw-bold text-secondary small mb-2">GitHub Repository Storage</h6>
+                <h6 class="fw-semibold text-secondary small text-uppercase mb-3">GitHub Repository Storage</h6>
                 {% if config.GITHUB_TOKEN and config.GITHUB_REPO %}
                     <form action="{{ url_for('main.backup_github_push') }}" method="POST" class="mb-3">
-                        <button type="submit" class="btn btn-dark btn-sm w-100"><i class="fa-brands fa-github me-2"></i>Backup Database to GitHub</button>
+                        <button type="submit" class="btn btn-dark btn-sm w-100">
+                            <i class="fa-brands fa-github me-2"></i>Push Backup to GitHub
+                        </button>
                     </form>
-                    
-                    <label class="form-label small fw-semibold text-muted">Available Backups in GitHub ({{ config.GITHUB_REPO }})</label>
+
+                    <label class="form-label small fw-semibold text-muted">
+                        Stored in <code>{{ config.GITHUB_REPO }}</code>
+                    </label>
                     <div id="github-backups-loader" class="text-center py-3">
                         <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
-                        <span class="small text-muted ms-2">Fetching backups...</span>
+                        <span class="small text-muted ms-2">Fetching backups…</span>
                     </div>
-                    <div id="github-backups-list" class="list-group list-group-flush border rounded bg-light mt-1 d-none" style="max-height: 200px; overflow-y: auto;">
+                    <div id="github-backups-list" class="list-group list-group-flush border rounded bg-light mt-1 d-none"
+                         style="max-height:250px;overflow-y:auto;">
                         <!-- Dynamically filled by JS -->
                     </div>
                 {% else %}
-                    <div class="alert alert-warning py-2 px-3 mb-0" style="font-size:0.8em; border-radius:.5rem;">
-                        <i class="fa-solid fa-circle-info me-1"></i>To enable GitHub backups, configure <code>GITHUB_TOKEN</code> and <code>GITHUB_REPO</code> in your environment.
+                    <div class="alert alert-warning py-2 px-3 mb-0" style="font-size:0.8em;border-radius:.5rem;">
+                        <i class="fa-solid fa-circle-info me-1"></i>
+                        Configure <code>GITHUB_TOKEN</code> and <code>GITHUB_REPO</code> in your environment to enable GitHub backups.
                     </div>
                 {% endif %}
             </div>
+
         </div>
-    </div>
-
-    <!-- Right Column: Lists (Experience, Projects, Education, Certifications) -->
-    <div class="col-lg-7">
-        
-        <!-- Work Experience -->
-        <div class="card border-0 shadow-sm p-4 mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0"><i class="fa-solid fa-briefcase text-primary me-2"></i>Work Experience</h5>
-                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#addExpCollapse">
-                    <i class="fa-solid fa-plus me-1"></i>Add Entry
-                </button>
-            </div>
-
-            <!-- Add Entry Collapse -->
-            <div class="collapse mb-4" id="addExpCollapse">
-                <div class="bg-light p-3 rounded">
-                    <form action="{{ url_for('main.resume_profile') }}" method="POST">
-                        <input type="hidden" name="action" value="add_experience">
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <input type="text" name="company" class="form-control form-control-sm" placeholder="Company Name" required>
-                            </div>
-                            <div class="col-6">
-                                <input type="text" name="position" class="form-control form-control-sm" placeholder="Job Title" required>
-                            </div>
-                        </div>
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <input type="text" name="start_date" class="form-control form-control-sm" placeholder="Start Date (e.g. 2022-03)" required>
-                            </div>
-                            <div class="col-6">
-                                <input type="text" name="end_date" class="form-control form-control-sm" placeholder="End Date (e.g. Present or 2024-05)">
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <textarea name="description" class="form-control form-control-sm" rows="4" placeholder="Description of your role, responsibilities, and achievements (use bullet points starting with - )." required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-primary">Add Experience</button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Experience List -->
-            {% if profile.experience_json %}
-                <div class="list-group list-group-flush">
-                    {% for exp in profile.experience_json %}
-                    <div class="list-group-item px-0 py-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h6 class="fw-bold text-dark mb-1">{{ exp.position }} at {{ exp.company }}</h6>
-                                <span class="text-muted small d-block mb-2">{{ exp.start_date }} — {{ exp.end_date or 'Present' }}</span>
-                                <div class="text-dark small" style="white-space: pre-wrap; font-size: 0.9em;">{{ exp.description }}</div>
-                            </div>
-                            <form action="{{ url_for('main.resume_profile') }}" method="POST" onsubmit="return confirm('Delete this experience entry?');">
-                                <input type="hidden" name="action" value="delete_experience">
-                                <input type="hidden" name="index" value="{{ loop.index0 }}">
-                                <button type="submit" class="btn btn-sm text-danger"><i class="fa-regular fa-trash-can"></i></button>
-                            </form>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <span class="text-muted small">No work experience listed yet.</span>
-            {% endif %}
-        </div>
-
-        <!-- Projects -->
-        <div class="card border-0 shadow-sm p-4 mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0"><i class="fa-solid fa-code-fork text-primary me-2"></i>Projects</h5>
-                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#addProjCollapse">
-                    <i class="fa-solid fa-plus me-1"></i>Add Entry
-                </button>
-            </div>
-
-            <!-- Add Entry Collapse -->
-            <div class="collapse mb-4" id="addProjCollapse">
-                <div class="bg-light p-3 rounded">
-                    <form action="{{ url_for('main.resume_profile') }}" method="POST">
-                        <input type="hidden" name="action" value="add_project">
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <input type="text" name="title" class="form-control form-control-sm" placeholder="Project Title" required>
-                            </div>
-                            <div class="col-6">
-                                <input type="text" name="technologies" class="form-control form-control-sm" placeholder="Technologies Used (e.g. Go, AWS)" required>
-                            </div>
-                        </div>
-                        <div class="mb-2">
-                            <input type="text" name="link" class="form-control form-control-sm" placeholder="Project URL Link (optional)">
-                        </div>
-                        <div class="mb-3">
-                            <textarea name="description" class="form-control form-control-sm" rows="3" placeholder="Describe what you built, how you built it, and the results." required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-primary">Add Project</button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Projects List -->
-            {% if profile.projects_json %}
-                <div class="list-group list-group-flush">
-                    {% for proj in profile.projects_json %}
-                    <div class="list-group-item px-0 py-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h6 class="fw-bold text-dark mb-1">
-                                    {{ proj.title }}
-                                    {% if proj.link %}
-                                    <a href="https://{{ proj.link }}" target="_blank" class="small text-decoration-none ms-1"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
-                                    {% endif %}
-                                </h6>
-                                <span class="badge bg-light text-secondary mb-2">Tech: {{ proj.technologies }}</span>
-                                <div class="text-dark small" style="white-space: pre-wrap; font-size: 0.9em;">{{ proj.description }}</div>
-                            </div>
-                            <form action="{{ url_for('main.resume_profile') }}" method="POST" onsubmit="return confirm('Delete this project entry?');">
-                                <input type="hidden" name="action" value="delete_project">
-                                <input type="hidden" name="index" value="{{ loop.index0 }}">
-                                <button type="submit" class="btn btn-sm text-danger"><i class="fa-regular fa-trash-can"></i></button>
-                            </form>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <span class="text-muted small">No projects listed yet.</span>
-            {% endif %}
-        </div>
-
-        <!-- Education -->
-        <div class="card border-0 shadow-sm p-4 mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0"><i class="fa-solid fa-graduation-cap text-primary me-2"></i>Education</h5>
-                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#addEduCollapse">
-                    <i class="fa-solid fa-plus me-1"></i>Add Entry
-                </button>
-            </div>
-
-            <!-- Add Entry Collapse -->
-            <div class="collapse mb-4" id="addEduCollapse">
-                <div class="bg-light p-3 rounded">
-                    <form action="{{ url_for('main.resume_profile') }}" method="POST">
-                        <input type="hidden" name="action" value="add_education">
-                        <div class="row g-2 mb-2">
-                            <div class="col-12">
-                                <input type="text" name="school" class="form-control form-control-sm" placeholder="School Name / University" required>
-                            </div>
-                        </div>
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <input type="text" name="degree" class="form-control form-control-sm" placeholder="Degree (e.g. BS)" required>
-                            </div>
-                            <div class="col-6">
-                                <input type="text" name="field_of_study" class="form-control form-control-sm" placeholder="Field of Study" required>
-                            </div>
-                        </div>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <input type="text" name="graduation_date" class="form-control form-control-sm" placeholder="Graduation Year/Month" required>
-                            </div>
-                            <div class="col-6">
-                                <input type="text" name="gpa" class="form-control form-control-sm" placeholder="GPA (optional)">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-primary">Add Education</button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Education List -->
-            {% if profile.education_json %}
-                <div class="list-group list-group-flush">
-                    {% for edu in profile.education_json %}
-                    <div class="list-group-item px-0 py-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h6 class="fw-bold text-dark mb-1">{{ edu.degree }} in {{ edu.field_of_study }}</h6>
-                                <div class="text-dark small mb-1">{{ edu.school }}</div>
-                                <span class="text-muted small">Graduated: {{ edu.graduation_date }} {% if edu.gpa %}| GPA: {{ edu.gpa }}{% endif %}</span>
-                            </div>
-                            <form action="{{ url_for('main.resume_profile') }}" method="POST" onsubmit="return confirm('Delete this education entry?');">
-                                <input type="hidden" name="action" value="delete_education">
-                                <input type="hidden" name="index" value="{{ loop.index0 }}">
-                                <button type="submit" class="btn btn-sm text-danger"><i class="fa-regular fa-trash-can"></i></button>
-                            </form>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <span class="text-muted small">No education entries listed yet.</span>
-            {% endif %}
-        </div>
-
-        <!-- Certifications -->
-        <div class="card border-0 shadow-sm p-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="fw-bold mb-0"><i class="fa-solid fa-award text-primary me-2"></i>Certifications</h5>
-                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#addCertCollapse">
-                    <i class="fa-solid fa-plus me-1"></i>Add Entry
-                </button>
-            </div>
-
-            <!-- Add Entry Collapse -->
-            <div class="collapse mb-4" id="addCertCollapse">
-                <div class="bg-light p-3 rounded">
-                    <form action="{{ url_for('main.resume_profile') }}" method="POST">
-                        <input type="hidden" name="action" value="add_certification">
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <input type="text" name="name" class="form-control form-control-sm" placeholder="Certification Name" required>
-                            </div>
-                            <div class="col-6">
-                                <input type="text" name="authority" class="form-control form-control-sm" placeholder="Issuing Authority (e.g. AWS)" required>
-                            </div>
-                        </div>
-                        <div class="row g-2 mb-3">
-                            <div class="col-6">
-                                <input type="text" name="date_obtained" class="form-control form-control-sm" placeholder="Date Obtained (e.g. 2024-05)" required>
-                            </div>
-                            <div class="col-6">
-                                <input type="text" name="link" class="form-control form-control-sm" placeholder="Verification Link (optional)">
-                            </div>
-                        </div>
-                        <button type="submit" class="btn btn-sm btn-primary">Add Certification</button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- Certifications List -->
-            {% if profile.certifications_json %}
-                <div class="list-group list-group-flush">
-                    {% for cert in profile.certifications_json %}
-                    <div class="list-group-item px-0 py-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h6 class="fw-bold text-dark mb-1">
-                                    {{ cert.name }}
-                                    {% if cert.link %}
-                                    <a href="{{ cert.link }}" target="_blank" class="small text-decoration-none ms-1"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
-                                    {% endif %}
-                                </h6>
-                                <div class="text-dark small mb-1">Issued by: {{ cert.authority }}</div>
-                                <span class="text-muted small">Date: {{ cert.date_obtained }}</span>
-                            </div>
-                            <form action="{{ url_for('main.resume_profile') }}" method="POST" onsubmit="return confirm('Delete this certification entry?');">
-                                <input type="hidden" name="action" value="delete_certification">
-                                <input type="hidden" name="index" value="{{ loop.index0 }}">
-                                <button type="submit" class="btn btn-sm text-danger"><i class="fa-regular fa-trash-can"></i></button>
-                            </form>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <span class="text-muted small">No certifications listed yet.</span>
-            {% endif %}
-        </div>
-
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const loader = document.getElementById('github-backups-loader');
-    const list = document.getElementById('github-backups-list');
+    const list   = document.getElementById('github-backups-list');
     if (!loader || !list) return;
 
     fetch("{{ url_for('main.backup_github_list') }}")
-        .then(response => response.json())
+        .then(r => r.json())
         .then(data => {
             loader.classList.add('d-none');
             list.classList.remove('d-none');
-            
             if (data.success && data.backups && data.backups.length > 0) {
                 list.innerHTML = '';
                 data.backups.forEach(backup => {
                     const item = document.createElement('div');
                     item.className = 'list-group-item p-2 d-flex justify-content-between align-items-center bg-transparent border-bottom';
-                    
                     const infoDiv = document.createElement('div');
                     infoDiv.innerHTML = `
-                        <div class="small fw-semibold text-dark text-break" style="font-size: 0.85em;">${backup.filename}</div>
-                        <span class="text-muted" style="font-size: 0.7em;">${backup.size}</span>
-                    `;
-                    
+                        <div class="small fw-semibold text-dark text-break" style="font-size:0.85em;">${backup.filename}</div>
+                        <span class="text-muted" style="font-size:0.7em;">${backup.size}</span>`;
                     const formDiv = document.createElement('div');
                     formDiv.innerHTML = `
-                        <form action="{{ url_for('main.backup_github_restore') }}" method="POST" onsubmit="return confirm('WARNING: Restoring this backup will overwrite current database state. Proceed?');">
+                        <form action="{{ url_for('main.backup_github_restore') }}" method="POST"
+                              onsubmit="return confirm('Restoring will overwrite all current data. Proceed?');">
                             <input type="hidden" name="path" value="${backup.path}">
-                            <button type="submit" class="btn btn-sm btn-light text-success p-1" title="Restore"><i class="fa-solid fa-rotate-left"></i></button>
-                        </form>
-                    `;
-                    
+                            <button type="submit" class="btn btn-sm btn-light text-success p-1" title="Restore">
+                                <i class="fa-solid fa-rotate-left"></i>
+                            </button>
+                        </form>`;
                     item.appendChild(infoDiv);
                     item.appendChild(formDiv);
                     list.appendChild(item);
                 });
             } else {
-                list.innerHTML = '<p class="text-muted small text-center my-3"><i class="fa-solid fa-folder-open opacity-50 mb-1"></i><br>No GitHub backups found.</p>';
+                list.innerHTML = '<p class="text-muted small text-center my-3"><i class="fa-solid fa-folder-open opacity-50 d-block mb-1"></i>No GitHub backups found.</p>';
             }
         })
         .catch(err => {
-            console.error("Failed to load GitHub backups:", err);
+            console.error('Failed to load GitHub backups:', err);
             loader.classList.add('d-none');
             list.classList.remove('d-none');
-            list.innerHTML = '<p class="text-danger small text-center my-3"><i class="fa-solid fa-circle-exclamation mb-1"></i><br>Failed to fetch backups from GitHub.</p>';
+            list.innerHTML = '<p class="text-danger small text-center my-3"><i class="fa-solid fa-circle-exclamation d-block mb-1"></i>Failed to fetch backups from GitHub.</p>';
         });
 });
 </script>
 {% endblock %}
-

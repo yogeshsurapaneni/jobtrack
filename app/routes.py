@@ -1,5 +1,4 @@
 import json
-import threading
 from flask import Blueprint, render_template, redirect, url_for, request, flash, send_file, jsonify
 from app.models import db, User, Job, ApplicationHistory, Document, ResumeProfile, InterviewEvent
 from app.services.resume_generator import ResumeGeneratorService
@@ -12,42 +11,6 @@ main = Blueprint('main', __name__)
 
 
 # ---------------------------------------------------------------------------
-# Background generation helper
-# ---------------------------------------------------------------------------
-
-def _background_generate(app, job_id):
-    """
-    Runs resume + cover letter generation in a background thread so the
-    add-job POST can return immediately. Also triggers match score and
-    stores the result on the Job's notes metadata (via app context).
-    """
-    with app.app_context():
-        try:
-            ResumeGeneratorService.generate_tailored_resume(job_id)
-            print(f"[*] Auto-generated resume for job {job_id}")
-        except Exception as e:
-            print(f"[!] Auto resume generation failed for job {job_id}: {e}")
-
-        try:
-            CoverLetterGeneratorService.generate_cover_letter(job_id)
-            print(f"[*] Auto-generated cover letter for job {job_id}")
-        except Exception as e:
-            print(f"[!] Auto cover letter generation failed for job {job_id}: {e}")
-
-        try:
-            result = AIAnalysisService.analyze_job_match(job_id)
-            job = Job.query.get(job_id)
-            if job:
-                # Store match score in the job notes as a JSON prefix so UI can show it
-                score_tag = f"[MATCH:{result.get('score', '?')}%:{result.get('grade', '?')}]"
-                if job.notes and not job.notes.startswith('[MATCH:'):
-                    job.notes = f"{score_tag}\n{job.notes}"
-                elif not job.notes:
-                    job.notes = score_tag
-                db.session.commit()
-            print(f"[*] Auto match score computed for job {job_id}: {result.get('score')}%")
-        except Exception as e:
-            print(f"[!] Auto match score failed for job {job_id}: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -167,15 +130,7 @@ def add_job():
     db.session.add(history)
     db.session.commit()
 
-    # Auto-generate resume, cover letter, and match score in the background
-    if job_description:
-        app = current_app._get_current_object()
-        t = threading.Thread(target=_background_generate, args=(app, job.id), daemon=True)
-        t.start()
-        flash(f"Added {position} at {company}! Generating tailored CV, cover letter & match score in the background…", "success")
-    else:
-        flash(f"Added {position} at {company}! Add a job description to enable AI generation.", "info")
-
+    flash(f"Added {position} at {company}.", "success")
     return redirect(url_for('main.job_detail', job_id=job.id))
 
 
@@ -430,95 +385,7 @@ def resume_profile():
             db.session.commit()
             flash("Uploaded resume deleted.", "info")
 
-        elif action == 'add_experience':
-            exp = {
-                "company":    request.form.get('company'),
-                "position":   request.form.get('position'),
-                "start_date": request.form.get('start_date'),
-                "end_date":   request.form.get('end_date') or 'Present',
-                "description": request.form.get('description')
-            }
-            curr = list(profile.experience_json or [])
-            curr.append(exp)
-            profile.experience_json = curr
-            db.session.commit()
-            flash("Work experience entry added.", "success")
 
-        elif action == 'delete_experience':
-            idx  = int(request.form.get('index'))
-            curr = list(profile.experience_json or [])
-            if 0 <= idx < len(curr):
-                curr.pop(idx)
-                profile.experience_json = curr
-                db.session.commit()
-                flash("Work experience entry deleted.", "success")
-
-        elif action == 'add_project':
-            proj = {
-                "title":       request.form.get('title'),
-                "technologies": request.form.get('technologies'),
-                "description": request.form.get('description'),
-                "link":        request.form.get('link')
-            }
-            curr = list(profile.projects_json or [])
-            curr.append(proj)
-            profile.projects_json = curr
-            db.session.commit()
-            flash("Project entry added.", "success")
-
-        elif action == 'delete_project':
-            idx  = int(request.form.get('index'))
-            curr = list(profile.projects_json or [])
-            if 0 <= idx < len(curr):
-                curr.pop(idx)
-                profile.projects_json = curr
-                db.session.commit()
-                flash("Project entry deleted.", "success")
-
-        elif action == 'add_education':
-            edu = {
-                "school":         request.form.get('school'),
-                "degree":         request.form.get('degree'),
-                "field_of_study": request.form.get('field_of_study'),
-                "graduation_date": request.form.get('graduation_date'),
-                "gpa":            request.form.get('gpa')
-            }
-            curr = list(profile.education_json or [])
-            curr.append(edu)
-            profile.education_json = curr
-            db.session.commit()
-            flash("Education entry added.", "success")
-
-        elif action == 'delete_education':
-            idx  = int(request.form.get('index'))
-            curr = list(profile.education_json or [])
-            if 0 <= idx < len(curr):
-                curr.pop(idx)
-                profile.education_json = curr
-                db.session.commit()
-                flash("Education entry deleted.", "success")
-
-        elif action == 'add_certification':
-            cert = {
-                "name":          request.form.get('name'),
-                "authority":     request.form.get('authority'),
-                "date_obtained": request.form.get('date_obtained'),
-                "link":          request.form.get('link')
-            }
-            curr = list(profile.certifications_json or [])
-            curr.append(cert)
-            profile.certifications_json = curr
-            db.session.commit()
-            flash("Certification entry added.", "success")
-
-        elif action == 'delete_certification':
-            idx  = int(request.form.get('index'))
-            curr = list(profile.certifications_json or [])
-            if 0 <= idx < len(curr):
-                curr.pop(idx)
-                profile.certifications_json = curr
-                db.session.commit()
-                flash("Certification entry deleted.", "success")
 
         return redirect(url_for('main.resume_profile'))
 
